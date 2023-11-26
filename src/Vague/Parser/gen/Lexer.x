@@ -19,10 +19,11 @@ module Vague.Parser.Lexer (
    getRealSrcLoc, getPState,
    failMsgP, failLocMsgP, srcParseFail,
    getErrorMessages,
-   popContext, pushModuleContext, setLastToken, setSrcLoc,
+   popContext, pushModuleContext, setLastToken,
    nextIsEOF,
    getLexState, popLexState, pushLexState,
    commentToAnnotation,
+   lexTokenStream,
 ) where
 
 -- import GHC.Prelude
@@ -388,7 +389,7 @@ data ErrorDesc = ErrLexer LexErr LexErrKind | ErrParse String | ErrMissingBlock 
 
 data Error = Error
    { errDesc  :: !ErrorDesc   -- ^ Error description
-   , errLoc   :: !SrcSpan     -- ^ Error position
+   , errLoc   :: !RealSrcSpan     -- ^ Error position
    }
 
 nextChar :: StringBuffer -> (Char,StringBuffer)
@@ -634,7 +635,7 @@ reservedSymsFM = Map.fromList $
 -- -----------------------------------------------------------------------------
 -- Lexer actions
 
-type Action = PsSpan -> StringBuffer -> Int -> P (PsLocated Token)
+type Action = RealSrcSpan -> StringBuffer -> Int -> P (SrcLocated Token)
 
 special :: Token -> Action
 special tok span _buf _len = return (L span tok)
@@ -663,12 +664,12 @@ hopefully_open_brace :: Action
 hopefully_open_brace span buf len
  = do ctx <- getContext
       (AI l _) <- getInput
-      let offset = srcLocCol (psRealLoc l)
+      let offset = srcLocCol l
           isOK = case ctx of
                  Layout prev_off _ : _ -> prev_off < offset
                  _                     -> True
       if isOK then pop_and open_brace span buf len
-              else addFatalError $ Error ErrMissingBlock (mkSrcSpanPs span)
+              else addFatalError $ Error ErrMissingBlock span
 
 pop_and :: Action -> Action
 pop_and act span buf len = do _ <- popLexState
@@ -785,7 +786,7 @@ varid span buf len =
     Nothing ->
       return $ L span $ ITvarid fs
   where
-    !fs = lexemeToFastString buf len
+    !fs = error $ show (buf, len) -- lexemeToFastString buf len
 
 qvarsym, qconsym :: StringBuffer -> Int -> Token
 qvarsym buf len = ITqvarsym $! splitQualName buf len False
@@ -932,7 +933,7 @@ new_layout_context :: Bool -> Bool -> Token -> Action
 new_layout_context strict gen_semic tok span _buf len = do
     _ <- popLexState
     (AI l _) <- getInput
-    let offset = srcLocCol (psRealLoc l) - len
+    let offset = srcLocCol l - len
     ctx <- getContext
     case ctx of
         Layout prev_off _ : _  |
@@ -960,7 +961,7 @@ lex_string_tok :: Action
 lex_string_tok span buf _len = do
   tok <- lex_string "" ""
   (AI end bufEnd) <- getInput
-  return (L (mkPsSpan (psSpanStart span) end) tok)
+  return (L (mkRealSrcSpan (realSrcSpanStart span) end) tok)
 
 lex_string :: String -> String -> P Token
 lex_string src s = do
@@ -1093,9 +1094,9 @@ data PState = PState {
         warnings   :: Bag Warning,
         errors     :: Bag Error,
         last_tk    :: Maybe Token,
-        last_loc   :: PsSpan,      -- pos of previous token
+        last_loc   :: RealSrcSpan,      -- pos of previous token
         last_len   :: !Int,        -- len of previous token
-        loc        :: PsLoc,       -- current loc (end of prev token + 1)
+        loc        :: RealSrcLoc,       -- current loc (end of prev token + 1)
         context    :: [LayoutContext],
         lex_state  :: [Int],
         srcfiles   :: [FastString],
@@ -1137,28 +1138,20 @@ thenP :: P a -> (a -> P b) -> P b
                 POk s1 a         -> (unP (k a)) s1
                 PFailed s1 -> PFailed s1
 
-failMsgP :: (SrcSpan -> Error) -> P a
+failMsgP :: (RealSrcSpan -> Error) -> P a
 failMsgP f = do
   pState <- getPState
-  addFatalError (f (mkSrcSpanPs (last_loc pState)))
+  addFatalError (f (last_loc pState))
 
-failLocMsgP :: RealSrcLoc -> RealSrcLoc -> (SrcSpan -> Error) -> P a
+failLocMsgP :: RealSrcLoc -> RealSrcLoc -> (RealSrcSpan -> Error) -> P a
 failLocMsgP loc1 loc2 f =
-  addFatalError (f (RealSrcSpan (mkRealSrcSpan loc1 loc2) Nothing))
+  addFatalError (f (mkRealSrcSpan loc1 loc2))
 
 getPState :: P PState
 getPState = P $ \s -> POk s s
 
-setSrcLoc :: RealSrcLoc -> P ()
-setSrcLoc new_loc =
-  P $ \s@(PState{ loc = PsLoc _ buf_loc }) ->
-  POk s{ loc = PsLoc new_loc buf_loc } ()
-
 getRealSrcLoc :: P RealSrcLoc
-getRealSrcLoc = P $ \s@(PState{ loc=loc }) -> POk s (psRealLoc loc)
-
-getParsedLoc :: P PsLoc
-getParsedLoc  = P $ \s@(PState{ loc=loc }) -> POk s loc
+getRealSrcLoc = P $ \s@(PState{ loc=loc }) -> POk s loc
 
 addSrcFile :: FastString -> P ()
 addSrcFile f = P $ \s -> POk s{ srcfiles = f : srcfiles s } ()
@@ -1166,7 +1159,7 @@ addSrcFile f = P $ \s -> POk s{ srcfiles = f : srcfiles s } ()
 setEofPos :: RealSrcSpan -> P ()
 setEofPos span = P $ \s -> POk s{ eof_pos = Just span } ()
 
-setLastToken :: PsSpan -> Int -> P ()
+setLastToken :: RealSrcSpan -> Int -> P ()
 setLastToken loc len = P $ \s -> POk s {
   last_loc=loc,
   last_len=len
@@ -1178,7 +1171,7 @@ setLastTk tk = P $ \s -> POk s { last_tk = Just tk } ()
 getLastTk :: P (Maybe Token)
 getLastTk = P $ \s@(PState { last_tk = last_tk }) -> POk s last_tk
 
-data AlexInput = AI !PsLoc !StringBuffer
+data AlexInput = AI !RealSrcLoc !StringBuffer
 
 {-
 Note [Unicode in Alex]
@@ -1268,7 +1261,7 @@ alexGetByte (AI loc s)
   | atEnd s   = Nothing
   | otherwise = byte `seq` Just (byte, AI loc' s')
   where (c,s') = nextChar s
-        loc'   = advancePsLoc loc c
+        loc'   = advanceSrcLoc loc c
         byte   = adjustChar c
 
 -- This version does not squash unicode characters, it is used when
@@ -1278,7 +1271,7 @@ alexGetChar' (AI loc s)
   | atEnd s   = Nothing
   | otherwise = c `seq` Just (c, AI loc' s')
   where (c,s') = nextChar s
-        loc'   = advancePsLoc loc c
+        loc'   = advanceSrcLoc loc c
 
 getInput :: P AlexInput
 getInput = P $ \s@PState{ loc=l, buffer=b } -> POk s (AI l b)
@@ -1301,15 +1294,15 @@ getLexState :: P Int
 getLexState = P $ \s@PState{ lex_state=ls:_ } -> POk s ls
 
 initParserState :: StringBuffer -> RealSrcLoc -> PState
-initParserState buf loc =
+initParserState buf loc' =
   PState {
       buffer        = buf,
       errors        = emptyBag,
       warnings      = emptyBag,
       last_tk       = Nothing,
-      last_loc      = mkPsSpan init_loc init_loc,
+      last_loc      = mkRealSrcSpan loc' loc',
       last_len      = 0,
-      loc           = init_loc,
+      loc           = loc',
       context       = [],
       lex_state     = [bol, 0],
       srcfiles      = [],
@@ -1318,7 +1311,6 @@ initParserState buf loc =
       comment_q = [],
       annotations_comments = []
     }
-  where init_loc = PsLoc loc (BufPos 0)
 
 -- | Add a non-fatal error. Use this when the parser can produce a result
 --   despite the error.
@@ -1340,9 +1332,9 @@ addError :: Error -> P ()
 addFatalError :: Error -> P a
 
 -- | Given a location and a list of AddAnn, apply them all to the location.
-addAnnotation :: SrcSpan          -- SrcSpan of enclosing AST construct
+addAnnotation :: RealSrcSpan          -- RealSrcSpan of enclosing AST construct
               -> AnnKeywordId     -- The first two parameters are the key
-              -> SrcSpan          -- The location of the keyword itself
+              -> RealSrcSpan          -- The location of the keyword itself
               -> P ()
 
 addError err
@@ -1351,7 +1343,7 @@ addError err
 addFatalError err =
   addError err >> P PFailed
 
-addAnnotation (RealSrcSpan l _) a (RealSrcSpan v _) = do
+addAnnotation l a v = do
   addAnnotationOnly l a v
   allocateCommentsP l
 addAnnotation _ _ _ = return ()
@@ -1374,12 +1366,12 @@ popContext = P $ \ s@(PState{ buffer = buf, context = ctx,
         (_:tl) ->
           POk s{ context = tl } ()
         []     ->
-          unP (addFatalError $ srcParseErr buf len (mkSrcSpanPs last_loc)) s
+          unP (addFatalError $ srcParseErr buf len last_loc) s
 
 -- Push a new layout context at the indentation of the last token read.
 pushCurrentContext :: GenSemic -> P ()
 pushCurrentContext gen_semic = P $ \ s@PState{ last_loc=loc, context=ctx } ->
-    POk s{context = Layout (srcSpanStartCol (psRealSpan loc)) gen_semic : ctx} ()
+    POk s{context = Layout (srcSpanStartCol loc) gen_semic : ctx} ()
 
 -- This is only used at the outer level of a module when the 'module' keyword is
 -- missing.
@@ -1388,7 +1380,7 @@ pushModuleContext = pushCurrentContext generateSemic
 
 getOffside :: P (Ordering, Bool)
 getOffside = P $ \s@PState{last_loc=loc, context=stk} ->
-                let offs = srcSpanStartCol (psRealSpan loc) in
+                let offs = srcSpanStartCol loc in
                 let ord = case stk of
                             Layout n gen_semic : _ ->
                               --trace ("layout: " ++ show n ++ ", offs: " ++ show offs) $
@@ -1403,7 +1395,7 @@ getOffside = P $ \s@PState{last_loc=loc, context=stk} ->
 srcParseErr
   :: StringBuffer       -- current buffer (placed just after the last token)
   -> Int                -- length of the previous token
-  -> SrcSpan
+  -> RealSrcSpan
   -> Error
 srcParseErr buf len loc = Error (ErrParse token) loc
   where
@@ -1415,7 +1407,7 @@ srcParseErr buf len loc = Error (ErrParse token) loc
 srcParseFail :: P a
 srcParseFail = P $ \s@PState{ buffer = buf, last_len = len,
                             last_loc = last_loc } ->
-    unP (addFatalError $ srcParseErr buf len (mkSrcSpanPs last_loc)) s
+    unP (addFatalError $ srcParseErr buf len last_loc) s
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.
@@ -1423,29 +1415,42 @@ lexError :: LexErr -> P a
 lexError e = do
   loc <- getRealSrcLoc
   (AI end buf) <- getInput
-  reportLexError loc (psRealLoc end) buf
+  reportLexError loc end buf
     (\k -> Error (ErrLexer e k))
 
-lexToken :: P (PsLocated Token)
+-- -----------------------------------------------------------------------------
+-- This is the top-level function: called from the parser each time a
+-- new token is to be read from the input.
+
+lexer :: Bool -> (SrcLocated Token -> P a) -> P a
+
+lexer queueComments cont = do
+  (L span tok) <- lexToken
+  --trace ("token: " ++ show tok) $ do
+  if (queueComments && isComment tok)
+    then queueComment (L span tok) >> lexer queueComments cont
+    else cont (L span tok)
+
+lexToken :: P (SrcLocated Token)
 lexToken = do
   inp@(AI loc1 buf) <- getInput
   sc <- getLexState
   let exts = undefined -- getExts
   case alexScanUser exts inp sc of
     AlexEOF -> do
-        let span = mkPsSpan loc1 loc1
-        setEofPos (psRealSpan span)
+        let span = mkRealSrcSpan loc1 loc1
+        setEofPos span
         setLastToken span 0
         return (L span ITeof)
     AlexError (AI loc2 buf) ->
-        reportLexError (psRealLoc loc1) (psRealLoc loc2) buf
+        reportLexError loc1 loc2 buf
           (\k -> Error (ErrLexer LexError k))
     AlexSkip inp2 _ -> do
         setInput inp2
         lexToken
     AlexToken inp2@(AI end buf2) _ t -> do
         setInput inp2
-        let span = mkPsSpan loc1 end
+        let span = mkRealSrcSpan loc1 end
         let bytes = byteDiff buf buf2
         span `seq` setLastToken span bytes
         lt <- t span buf bytes
@@ -1453,7 +1458,7 @@ lexToken = do
         unless (isComment lt') (setLastTk lt')
         return lt
 
-reportLexError :: RealSrcLoc -> RealSrcLoc -> StringBuffer -> (LexErrKind -> SrcSpan -> Error) -> P a
+reportLexError :: RealSrcLoc -> RealSrcLoc -> StringBuffer -> (LexErrKind -> RealSrcSpan -> Error) -> P a
 reportLexError loc1 loc2 buf f
   | atEnd buf = failLocMsgP loc1 loc2 (f LexErrKind_EOF)
   | otherwise =
@@ -1461,6 +1466,16 @@ reportLexError loc1 loc2 buf f
   in if c == '\0' -- decoding errors are mapped to '\0', see utf8DecodeChar#
      then failLocMsgP loc2 loc2 (f LexErrKind_UTF8)
      else failLocMsgP loc1 loc2 (f (LexErrKind_Char c))
+
+lexTokenStream :: StringBuffer -> RealSrcLoc -> ParseResult [SrcLocated Token]
+lexTokenStream buf loc = unP go initState
+    where
+    initState = initParserState buf loc
+    go = do
+      ltok <- lexer False return
+      case ltok of
+        L _ ITeof -> return []
+        _ -> liftM (ltok:) go
 
 {-
 %************************************************************************
@@ -1477,7 +1492,7 @@ addAnnotationOnly l a v = P $ \s -> POk s {
   } ()
 
 
-queueComment :: Located Token -> P()
+queueComment :: SrcLocated Token -> P()
 queueComment c = P $ \s -> POk s {
   comment_q = commentToAnnotation c : comment_q s
   } ()
