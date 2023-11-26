@@ -96,14 +96,14 @@ mkLContext ys =
 
 rules :: [([LContextName], String, Action)]
 rules =
-  [ ([], "(?:(?!\\n)\\p{Zs})+", skip) -- skip whitespace but not newlines
-  , ([], "#[^\\n]*", skip) -- skip comments
-  , ([LBOL], "\\n", skip) -- skip newlines
-  , ([LBOL], "(?!\\p{Zs})", doBol) -- WARNING! It should be the last rule!
-  , ([L0], "\\n", \_ _ -> runLexer . pushLContext LBOL)
-  , ([L0], trace "L0{" "\\{", openBrace)
-  , ([L0], "\\}", closeBrace)
-  , ([LTEST], "\\x{1F923}", token LOL)
+  [ ([], "(?:(?!\\n)\\p{Zs})+", skip), -- skip whitespace but not newlines
+    ([], "#[^\\n]*", skip), -- skip comments
+    ([LBOL], "\\n", skip), -- skip newlines
+    ([LBOL], "(?!\\p{Zs})", doBol), -- WARNING! It should be the last rule!
+    ([L0], "\\n", \_ _ -> runLexer . pushLContext LBOL),
+    ([L0], trace "L0{" "\\{", openBrace),
+    ([L0], "\\}", closeBrace),
+    ([LTEST], "\\x{1F923}", token LOL)
   ]
 
 -- | Get runLexer context from its name.
@@ -144,10 +144,10 @@ closeBrace sp match state =
 -- Lexer state
 
 data State = State
-  { ctxStack :: [LContext]
-  , layouts :: [Layout]
-  , location :: Loc
-  , input :: ByteString
+  { ctxStack :: [LContext],
+    layouts :: [Layout],
+    location :: Loc,
+    input :: ByteString
   }
 
 data Layout
@@ -161,7 +161,7 @@ pushLayout l State {..} = State {layouts = l : layouts, ..}
 popLayout :: State -> Maybe State
 popLayout State {..} = case layouts of
   [] -> Nothing
-  _:ls -> Just State {layouts=ls, ..}
+  _ : ls -> Just State {layouts = ls, ..}
 
 pushLContext :: LContextName -> State -> State
 pushLContext s State {..} = State {ctxStack = getLContext s : ctxStack, ..}
@@ -169,7 +169,7 @@ pushLContext s State {..} = State {ctxStack = getLContext s : ctxStack, ..}
 popLContext :: State -> State
 popLContext State {..} = case ctxStack of
   [] -> error "BUG: popLContext"
-  _:cs -> State {ctxStack=cs, ..}
+  _ : cs -> State {ctxStack = cs, ..}
 
 --------------------------------------------------------------------------------
 

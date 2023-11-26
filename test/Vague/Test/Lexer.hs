@@ -20,7 +20,7 @@ tests :: TestTree
 tests =
   testGroup
     "Lexer"
-    [ makeTest "empty"
-    , makeTest "ass"
-    , makeTest "curly"
+    [ makeTest "empty",
+      makeTest "ass",
+      makeTest "curly"
     ]
