@@ -16,6 +16,10 @@ import qualified Data.Vector as Vector
 import Debug.Trace
 import qualified Text.Regex.PCRE as PCRE
 import Vague.Located
+import qualified Vague.FastString as FastString
+import Vague.FastString (FastString)
+import Prelude hiding (span)
+import Data.ByteString.Internal (c2w)
 
 -- https://www.pcre.org/original/doc/html/pcrepattern.html
 
@@ -28,6 +32,15 @@ data LStream
 data Token
   = LCurly
   | RCurly
+  | LParens
+  | RParens
+  | LBracket
+  | RBracket
+  | Comma
+  | Semicolon
+  | Qualid [FastString] FastString
+  | Symbol FastString
+  | Decimal Integer
   | LOL -- just for testing
   deriving (Show)
 
@@ -103,8 +116,23 @@ rules =
     ([L0], "\\n", \_ _ -> runLexer . pushLContext LBOL),
     ([L0], trace "L0{" "\\{", openBrace),
     ([L0], "\\}", closeBrace),
+    ([L0], "\\(", token LParens),
+    ([L0], "\\(", token RParens),
+    ([L0], "\\[", token LBracket),
+    ([L0], "\\]", token RBracket),
+    ([L0], ",", token Comma),
+    ([L0], ";", token Semicolon),
+    ([L0], "(?:" <> varidRe <> "\\.)*" <> varidRe, idtoken),
+    ([L0], symRe, symtoken),
+    ([L0], "[0-9]+", decimal),
     ([LTEST], "\\x{1F923}", token LOL)
   ]
+
+varidRe :: String
+varidRe = "[a-zA-Z][a-zA-Z0-9]*"
+
+symRe :: String
+symRe = "[\\!\\$\\%\\&\\*\\+\\.\\/\\<\\=\\>\\?\\@\\\\\\^\\|\\-\\~\\:]+"
 
 -- | Get runLexer context from its name.
 getLContext :: LContextName -> LContext
@@ -117,9 +145,39 @@ getLContext = (Map.!) lmap
 --------------------------------------------------------------------------------
 -- Actions
 
+idtoken :: Action
+idtoken span match state = do
+  let ids = map FastString.fromByteString $
+        -- FIXME: do not split on the byte '.'
+        -- which is wrong according to unicode
+        ByteString.split (c2w '.') match
+  case unsnoc ids of
+    Nothing -> lexerError $ LexerError "BUG: idtoken"
+    Just (xs, x) -> do
+      let tok = Qualid xs x
+      LToken span tok $ runLexer state
+  where
+    unsnoc [] = Nothing
+    unsnoc (x:xs) = Just (go x xs)
+    go x [] = ([], x)
+    go x (y:ys) = do
+      let (zs, z) = go y ys
+      (x:zs, z)
+
+symtoken :: Action
+symtoken span match state = do
+  let tok = Symbol (FastString.fromByteString match)
+  LToken span tok $ runLexer state
+
+decimal :: Action
+decimal span match state = do
+  let s = UTF8.toString match
+      tok = Decimal (read s)
+  LToken span tok $ runLexer state
+
 -- | Skip matched string.
 skip :: Action
-skip _span _match state = runLexer state
+skip _span _match = runLexer
 
 -- | Emit token.
 token :: Token -> Action
