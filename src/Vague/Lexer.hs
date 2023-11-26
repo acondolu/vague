@@ -14,7 +14,7 @@ import Data.List (intercalate)
 import qualified Data.Map as Map
 import qualified Data.Vector as Vector
 import Debug.Trace
-import Text.Regex.PCRE as PCRE
+import qualified Text.Regex.PCRE as PCRE
 import Vague.Located
 
 -- https://www.pcre.org/original/doc/html/pcrepattern.html
@@ -47,9 +47,9 @@ type Action =
 runLexer :: State -> LStream
 runLexer State {ctxStack = []} =
   lexerError $ LexerError "BUG: empty context stack"
-runLexer State {..} | ByteString.null input = LEnd
+runLexer State {..} | ByteString.null input = LEnd -- end of file
 runLexer State {ctxStack = s@((pattern, acts) : _), ..} =
-  case matchOnceText pattern input of
+  case PCRE.matchOnceText pattern input of
     Nothing -> lexerError $ LexerError $ parseErrorOnInput location input
     Just (_, arr, rest) -> go rest $ tail $ Array.assocs arr
   where
@@ -85,12 +85,12 @@ nChars bs = case UTF8.decode bs of
 data LContextName = L0 | LBOL | LTEST
   deriving (Eq, Ord, Show, Enum, Bounded)
 
-type LContext = (Regex, Vector.Vector Action)
+type LContext = (PCRE.Regex, Vector.Vector Action)
 
 mkLContext :: [(String, Action)] -> LContext
 mkLContext ys =
   let !patstr = "\\A(" <> intercalate ")|\\A(" (map fst ys) <> ")"
-      !pattern = makeRegexOpts compUTF8 defaultExecOpt $ pack patstr
+      !pattern = PCRE.makeRegexOpts PCRE.compUTF8 PCRE.defaultExecOpt $ pack patstr
       !actions = Vector.fromList $ map snd ys
    in (pattern, actions)
 
@@ -123,26 +123,22 @@ skip _span _match state = runLexer state
 
 -- | Emit token.
 token :: Token -> Action
-token t span _match state = LToken span t $ runLexer state
-
--- | End of file.
-eof :: Action
-eof _ _ _ = LEnd
+token t sp _match state = LToken sp t $ runLexer state
 
 -- | First token on a line, insert layout tokens if necessary.
 doBol :: Action
 doBol _span _match state = runLexer (popLContext state)
 
 openBrace :: Action
-openBrace span _match state =
-  LToken span LCurly $ runLexer (pushLayout NoLayout state)
+openBrace sp _match state =
+  LToken sp LCurly $ runLexer (pushLayout NoLayout state)
 
 closeBrace :: Action
-closeBrace span match state =
+closeBrace sp match state =
   case popLayout state of
-    Nothing -> case span of
+    Nothing -> case sp of
       Span loc _ -> lexerError $ LexerError $ parseErrorOnInput loc match
-    Just state' -> LToken span RCurly $ runLexer state'
+    Just state' -> LToken sp RCurly $ runLexer state'
 
 --------------------------------------------------------------------------------
 -- Lexer state

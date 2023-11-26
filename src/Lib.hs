@@ -1,9 +1,3 @@
-module Lib
-  ( someFunc,
-  )
-where
+module Lib () where
 
 import Vague.Lexer ()
-
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"

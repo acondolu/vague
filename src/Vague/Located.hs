@@ -1,6 +1,9 @@
 {-# LANGUAGE StrictData #-}
 
-module Vague.Located where
+module Vague.Located (
+  Loc (..),
+  Span (..),
+) where
 
 data Loc = Loc {locRow :: Int, locCol :: Int}
 
