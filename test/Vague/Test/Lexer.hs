@@ -22,5 +22,7 @@ tests =
     "Lexer"
     [ makeTest "empty",
       makeTest "ass",
-      makeTest "curly"
+      makeTest "curly",
+      makeTest "str",
+      makeTest "def"
     ]

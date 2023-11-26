@@ -1,0 +1,1 @@
+LToken (Span 1:1 1:45) (Literal "hello, world! \" This is a string \NUL\n\r\"") LEnd
