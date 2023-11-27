@@ -283,7 +283,9 @@ doBol span _match state = do
   let col = case span of Span _ (Loc _ col') -> col'
       loc = case span of Span _ loc' -> loc'
       state' = popLContext state
-      maybePopLayouts [] = runLexer (state' {layouts = []})
+      maybePopLayouts []
+        | col == 0 = LToken (Span loc loc) LSep $ runLexer (state' {layouts = []})
+        | otherwise = runLexer (state' {layouts = []})
       maybePopLayouts l@(Layout n : ls) =
         case compare n col of
           LT -> runLexer (state' {layouts = l})
