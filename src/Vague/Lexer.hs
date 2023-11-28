@@ -31,21 +31,23 @@ data LStream
   deriving (Show)
 
 data Token
-  = LCurly
+  = -- brackets
+    LCurly
   | RCurly
-  | LParens
-  | RParens
-  | LBracket
-  | RBracket
-  | Comma
-  | Semicolon
-  | Qualid [FastString] FastString
-  | Symbol FastString
+  | LRound
+  | RRound
+  | LSquare
+  | RSquare
+  | -- scoping (inserted)
+    ScopeBegin
+  | ScopeEnd
+  | ScopeSep
+  | -- other symbols
+    Symbol FastString
+  | --
+    Qualid [FastString] FastString
   | Decimal Integer
   | Literal ByteString
-  | LScope
-  | LScopeEnd
-  | LSep
   | LOL -- just for testing
   deriving (Show)
 
@@ -139,12 +141,10 @@ rules =
     ([L0], "\\n", \_ _ -> runLexer . pushLContext LBOL),
     ([L0], "\\{", openBrace),
     ([L0], "\\}", closeBrace),
-    ([L0], "\\(", token LParens),
-    ([L0], "\\(", token RParens),
-    ([L0], "\\[", token LBracket),
-    ([L0], "\\]", token RBracket),
-    ([L0], ",", token Comma),
-    ([L0], ";", token Semicolon),
+    ([L0], "\\(", token LRound),
+    ([L0], "\\(", token RRound),
+    ([L0], "\\[", token LSquare),
+    ([L0], "\\]", token RSquare),
     ([L0], "(?:" <> varidRe <> "\\.)*" <> varidRe, doId),
     ([L0], "\\-?[0-9]+", doDecimal),
     ([L0], symRe, doSymbol),
@@ -284,13 +284,13 @@ doBol span _match state = do
       loc = case span of Span _ loc' -> loc'
       state' = popLContext state
       maybePopLayouts []
-        | col == 0 = LToken (Span loc loc) LSep $ runLexer (state' {layouts = []})
+        | col == 0 = LToken (Span loc loc) ScopeSep $ runLexer (state' {layouts = []})
         | otherwise = runLexer (state' {layouts = []})
       maybePopLayouts l@(Layout n : ls) =
         case compare n col of
           LT -> runLexer (state' {layouts = l})
-          EQ -> LToken (Span loc loc) LSep $ runLexer (state' {layouts = l})
-          GT -> LToken (Span loc loc) LScopeEnd $ maybePopLayouts ls
+          EQ -> LToken (Span loc loc) ScopeSep $ runLexer (state' {layouts = l})
+          GT -> LToken (Span loc loc) ScopeEnd $ maybePopLayouts ls
       maybePopLayouts (NoLayout : _) = error "doBol: NoLayout" -- TODO: remove NoLayout
   maybePopLayouts (layouts state)
 
@@ -309,13 +309,13 @@ doFindOffside :: Action
 doFindOffside span _ state = do
   let col = case span of Span _ (Loc _ col') -> col'
       state' = state & pushLayout (Layout col) & popLContext
-  LToken span LScope $ runLexer state'
+  LToken span ScopeBegin $ runLexer state'
 
 doEOF :: Loc -> [Layout] -> LStream
 doEOF loc = popAllLayouts
   where
     popAllLayouts [] = LEnd
-    popAllLayouts (Layout _ : ls) = LToken (Span loc loc) LScopeEnd $ popAllLayouts ls
+    popAllLayouts (Layout _ : ls) = LToken (Span loc loc) ScopeEnd $ popAllLayouts ls
     popAllLayouts (NoLayout : _) = error "doEOF: NoLayout" -- TODO: remove NoLayout
 
 --------------------------------------------------------------------------------
