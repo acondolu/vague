@@ -1,17 +1,28 @@
-module Vague.Parser where
+module Vague.Parser
+  ( parse,
+    Error,
+  )
+where
 
 import Vague.FastString (FastString)
 import Vague.Lexer (LStream (..), Token (..))
 import qualified Vague.Lexer as Lexer
 import Vague.Located
-import Vague.Parser.Structure ()
-import qualified Vague.Parser.Syntax as Syntax
+import Vague.Parser.Error (Error)
+import qualified Vague.Parser.Structure as Structure
+import Vague.Parser.Syntax
 import Prelude hiding (span)
 
-type Parser a b = (Span -> a -> Lexer.LStream -> b) -> Lexer.LStream -> b
+type Result = ()
+
+-- parse :: Lexer.LStream -> Either Error Program
+parse :: Lexer.LStream -> Either Error Structure.Tree
+parse stream = do
+  struct <- Structure.toStructure stream
+  pure $ Structure.toTree struct
 
 --------------------------------------------------------------------------------
-type Result = ()
+type Parser a b = (Span -> a -> Lexer.LStream -> b) -> Lexer.LStream -> b
 
 withToken :: Parser Lexer.Token Result
 withToken k (LToken span tok stream) = k span tok stream
@@ -27,8 +38,6 @@ parsePattern :: Parser Pattern Result
 parsePattern k = withToken $ \span -> \case
   Qualid xs x -> undefined
   _ -> undefined
-
-type Declaration = ()
 
 parseDeclaration :: Parser Declaration Result
 parseDeclaration k = withToken $ \span tok ->

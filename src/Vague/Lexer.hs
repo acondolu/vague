@@ -3,7 +3,14 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
 
-module Vague.Lexer (LStream (..), Token (..), LexerError (..), main, lexer) where
+module Vague.Lexer
+  ( LStream (..),
+    Token (..),
+    LexerError (..),
+    lexer,
+    main, -- TODO: remove
+  )
+where
 
 import qualified Data.Array as Array
 import Data.ByteString (ByteString)
@@ -41,7 +48,6 @@ data Token
   | -- scoping (inserted)
     ScopeBegin
   | ScopeEnd
-  | ScopeSep
   | -- other symbols
     Symbol FastString
   | --
@@ -284,12 +290,12 @@ doBol span _match state = do
       loc = case span of Span _ loc' -> loc'
       state' = popLContext state
       maybePopLayouts []
-        | col == 0 = LToken (Span loc loc) ScopeSep $ runLexer (state' {layouts = []})
+        | col == 0 = LToken (Span loc loc) (Symbol ";") $ runLexer (state' {layouts = []})
         | otherwise = runLexer (state' {layouts = []})
       maybePopLayouts l@(Layout n : ls) =
         case compare n col of
           LT -> runLexer (state' {layouts = l})
-          EQ -> LToken (Span loc loc) ScopeSep $ runLexer (state' {layouts = l})
+          EQ -> LToken (Span loc loc) (Symbol ";") $ runLexer (state' {layouts = l})
           GT -> LToken (Span loc loc) ScopeEnd $ maybePopLayouts ls
       maybePopLayouts (NoLayout : _) = error "doBol: NoLayout" -- TODO: remove NoLayout
   maybePopLayouts (layouts state)
