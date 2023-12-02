@@ -8,7 +8,7 @@ module Vague.Parser.Structure
     BracketType (..),
     toStructure,
     toTree,
-    Tree,
+    Tree (..),
   )
 where
 
@@ -88,6 +88,11 @@ toStructure = \stream -> do
             error $ "expected scope end, found " <> show tok' <> " at " <> show loc
           LError _ -> ([], stream')
           LEnd -> ([], stream')
+      -- Type -> do
+      --   let (us, stream') = go [] stream
+      --   if null words
+      --     then ([UType us], stream')
+      --     else ([Group (reverse words), UType us], stream')
       _ ->
         if null words
           then ([], s)

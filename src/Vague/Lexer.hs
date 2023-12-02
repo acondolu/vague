@@ -54,6 +54,8 @@ data Token
     Qualid [FastString] FastString
   | Decimal Integer
   | Literal ByteString
+  -- Keywords
+  | Type
   | LOL -- just for testing
   deriving (Show)
 
@@ -151,6 +153,7 @@ rules =
     ([L0], "\\(", token RRound),
     ([L0], "\\[", token LSquare),
     ([L0], "\\]", token RSquare),
+    ([L0], "type", token Type),
     ([L0], "(?:" <> varidRe <> "\\.)*" <> varidRe, doId),
     ([L0], "\\-?[0-9]+", doDecimal),
     ([L0], symRe, doSymbol),
