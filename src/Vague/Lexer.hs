@@ -16,13 +16,11 @@ import qualified Data.Array as Array
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import Data.ByteString.Char8 (pack)
-import Data.ByteString.Internal (c2w)
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Function ((&))
 import Data.List (intercalate)
 import qualified Data.Map as Map
 import qualified Data.Vector as Vector
-import Debug.Trace
 import qualified Text.Regex.PCRE as PCRE
 import Vague.FastString (FastString)
 import qualified Vague.FastString as FastString
@@ -32,7 +30,7 @@ import Prelude hiding (span)
 -- https://www.pcre.org/original/doc/html/pcrepattern.html
 
 data LStream
-  = LToken Span Token LStream
+  = LToken Span Token ~LStream
   | LError LexerError
   | LEnd
   deriving (Show)
@@ -51,7 +49,7 @@ data Token
   | -- other symbols
     Symbol FastString
   | --
-    Qualid [FastString] FastString
+    Qualid FastString FastString
   | Decimal Integer
   | Literal ByteString
   | -- Keywords
@@ -189,23 +187,17 @@ getLContext = (Map.!) lmap
 
 doId :: Action
 doId span match state = do
-  let ids =
-        map FastString.fromByteString $
-          -- FIXME: do not split on the byte '.'
-          -- which is wrong according to unicode
-          ByteString.split (c2w '.') match
-  case unsnoc ids of
-    Nothing -> lexerError $ LexerError "BUG: doId"
-    Just (xs, x) -> do
-      let tok = Qualid xs x
-      LToken span tok $ runLexer state
+  let (i, id') = go 0 match 0 match
+  let qual = FastString.fromByteString $ ByteString.take i match
+      name = FastString.fromByteString id'
+  LToken span (Qualid qual name) $ runLexer state
   where
-    unsnoc [] = Nothing
-    unsnoc (x : xs) = Just (go x xs)
-    go x [] = ([], x)
-    go x (y : ys) = do
-      let (zs, z) = go y ys
-      (x : zs, z)
+    go i j cur bs = case UTF8.decode bs of
+      Nothing -> (i, j)
+      Just ('.', n) -> do
+        let bs' = ByteString.drop n bs
+        go cur bs' (cur+n) bs'
+      Just (_, n) -> go i j (cur+n) (ByteString.drop n bs)
 
 doSymbol :: Action
 doSymbol span match state = do

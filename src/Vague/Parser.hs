@@ -64,7 +64,7 @@ parseBinding pat us = do
 parsePattern :: Units -> Either Error Pattern
 parsePattern = traverse go
   where
-    go (PToken _ (Qualid [] name)) = pure name
+    go (PToken _ (Qualid "" name)) = pure name
     go (PToken (Span loc _) tok) = Left $ UnexpectedToken loc tok
     go (PBrack ty _) = Left $ Bug $ "unexpected bracket: " <> pack (show ty)
 
@@ -135,9 +135,9 @@ popUntil _ operators operands =
 mkOp :: FastString -> Fixity -> [Expr] -> Either Error [Expr]
 mkOp name (Fixity (Binary _) _) (e2 : e1 : es) =
   -- fixme! spans are lost ...
-  pure $ AppE (IdE [] name) [e1, e2] : es
+  pure $ AppE (IdE "" name) [e1, e2] : es
 mkOp name (Fixity Unary _) (e : es) =
-  pure $ AppE (IdE [] name) [e] : es
+  pure $ AppE (IdE "" name) [e] : es
 mkOp _name _ [] = Left $ error "mkOp: no operands"
 mkOp _name _ [_] = Left $ error "mkOp: not enough operands"
 

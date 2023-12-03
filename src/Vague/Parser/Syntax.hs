@@ -29,7 +29,7 @@ data Expr
   = NumberE Integer
   | FloatE Double
   | LitE ByteString
-  | IdE [Id] Id
+  | IdE FastString Id
   | AppE Expr [Expr]
   | FunE [Id] Expr
   | Block [Statement]
