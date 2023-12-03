@@ -1,1 +1,1 @@
-Right (Leaf [WLiter (Span 1:1 1:45) "hello, world! \" This is a string \NUL\n\r\""])
+Right (Program [Statement (LitE "hello, world! \" This is a string \NUL\n\r\"")])

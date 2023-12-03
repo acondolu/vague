@@ -1,6 +1,8 @@
 module Vague.Parser.Syntax where
 
 import Data.Text (Text)
+import Vague.FastString (FastString)
+import Data.ByteString (ByteString)
 
 newtype Program = Program [Statement]
   deriving (Show)
@@ -15,19 +17,22 @@ data Statement
   | -- | type id = TypeExpr
     TypeBinding Id TypeExpr
   | -- | x = Expr
-    Binding Id Expr
+    Binding Pattern Expr
   | Statement Expr
   deriving (Show)
 
-type Id = Text
+type Pattern = [Id]
+
+type Id = FastString
 
 data Expr
-  = NumberE Int
+  = NumberE Integer
   | FloatE Double
-  | LitE Text
-  | IdE Id
+  | LitE ByteString
+  | IdE [Id] Id
   | AppE Expr [Expr]
   | FunE [Id] Expr
+  | Block [Statement]
   deriving (Show)
 
 data TypeExpr

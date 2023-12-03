@@ -55,9 +55,9 @@ data Token
   | Decimal Integer
   | Literal ByteString
   -- Keywords
-  | Type
+  | Keyword FastString
   | LOL -- just for testing
-  deriving (Show)
+  deriving (Show, Eq)
 
 data LexerError
   = LexerError String
@@ -153,7 +153,7 @@ rules =
     ([L0], "\\(", token RRound),
     ([L0], "\\[", token LSquare),
     ([L0], "\\]", token RSquare),
-    ([L0], "type", token Type),
+    ([L0], "type", token (Keyword "type")),
     ([L0], "(?:" <> varidRe <> "\\.)*" <> varidRe, doId),
     ([L0], "\\-?[0-9]+", doDecimal),
     ([L0], symRe, doSymbol),

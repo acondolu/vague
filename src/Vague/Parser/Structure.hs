@@ -9,6 +9,10 @@ module Vague.Parser.Structure
     toStructure,
     toTree,
     Tree (..),
+    Fixity (..),
+    Arity (..),
+    fixities,
+    (<<),
   )
 where
 
@@ -26,6 +30,7 @@ type Structure = [Unit]
 data Unit
   = Group [Word Structure] -- operand
   | USymbol Span FastString -- operator
+  | UKeyword Span FastString -- keyword
   deriving (Show)
 
 data BracketType = Round | Square | Curly | Scope
@@ -37,6 +42,7 @@ data Word a
   | WDecim Span Integer
   | WBrack BracketType a
   deriving (Show, Functor)
+
 
 toStructure :: Lexer.LStream -> Either Error.Error Structure
 toStructure = \stream -> do
@@ -88,11 +94,11 @@ toStructure = \stream -> do
             error $ "expected scope end, found " <> show tok' <> " at " <> show loc
           LError _ -> ([], stream')
           LEnd -> ([], stream')
-      -- Type -> do
-      --   let (us, stream') = go [] stream
-      --   if null words
-      --     then ([UType us], stream')
-      --     else ([Group (reverse words), UType us], stream')
+      Keyword kw -> do
+        let (us, stream') = go [] stream
+        if null words
+          then (UKeyword span kw : us, stream')
+          else (Group (reverse words) : UKeyword span kw : us, stream')
       _ ->
         if null words
           then ([], s)
@@ -147,6 +153,8 @@ sh = go [] []
     go operands operators (operator@(USymbol _span name) : ws) = do
       let (operands', operators') = popUntil operands operators name
       go operands' (operator : operators') ws
+    go operands operators (u@(UKeyword span fs):ws) = do
+      undefined
     go operands operators [] =
       reverse operands <> operators
 
