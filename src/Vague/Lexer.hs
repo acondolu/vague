@@ -54,8 +54,8 @@ data Token
     Qualid [FastString] FastString
   | Decimal Integer
   | Literal ByteString
-  -- Keywords
-  | Keyword FastString
+  | -- Keywords
+    Keyword FastString
   | LOL -- just for testing
   deriving (Show, Eq)
 

@@ -1,8 +1,8 @@
 module Vague.Parser.Syntax where
 
+import Data.ByteString (ByteString)
 import Data.Text (Text)
 import Vague.FastString (FastString)
-import Data.ByteString (ByteString)
 
 newtype Program = Program [Statement]
   deriving (Show)
