@@ -1,0 +1,1 @@
+Right (Program [Statement (AppE (IdE "" "+") [AppE (IdE "" "+") [NumberE 100,AppE (IdE "" "*") [NumberE 3,NumberE 7]],AppE (IdE "" "*") [NumberE 4,NumberE 12]]),Binding ["main","_"] (AppE (IdE "" "print") [NumberE 10])])
