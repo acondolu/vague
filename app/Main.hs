@@ -9,5 +9,7 @@ main :: IO ()
 main = getArgs >>= \case
   [fp] -> do
     bs <- ByteString.readFile fp
-    print $ Parser.parse $ Lexer.lexer bs
+    let res = Parser.parse $ Lexer.lexer bs
+    -- let res = Lexer.lexer bs
+    print res
   args -> error $ "invalid arguments supplied: " <> show args

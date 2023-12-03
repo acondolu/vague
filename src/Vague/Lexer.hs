@@ -124,7 +124,7 @@ nChars bs = case UTF8.decode bs of
 --------------------------------------------------------------------------------
 -- Contexts
 
-data LContextName = L0 | LBOL | LTEST | LMAYBELAYOUT | LFINDOFFSIDE
+data LContextName = L0 | LBOL | LINIT | LTEST | LMAYBELAYOUT | LFINDOFFSIDE
   deriving (Eq, Ord, Show, Enum, Bounded)
 
 type LContext = (PCRE.Regex, Vector.Vector Action)
@@ -141,8 +141,10 @@ rules =
   [ ([], "(?:(?!\\n)\\p{Zs})+", doSkip), -- doSkip whitespace but not newlines
     ([], "#[^\\n]*", doSkip), -- doSkip comments
     -- LBOL
-    ([LBOL, LFINDOFFSIDE], "\\n", doSkip), -- doSkip newlines
+    ([LINIT, LBOL, LFINDOFFSIDE], "\\n", doSkip), -- doSkip newlines
     ([LBOL], "(?!\\p{Zs})", doBol), -- WARNING! It should be the last rule!
+    -- LINIT
+    ([LINIT], "(?!\\p{Zs})", doInit), -- WARNING! It should be the last rule!
     -- L0
     ([L0], "\\n", \_ _ -> runLexer . pushLContext LBOL),
     ([L0], "\\{", openBrace),
@@ -285,7 +287,7 @@ doBol span _match state = do
       loc = case span of Span _ loc' -> loc'
       state' = popLContext state
       maybePopLayouts []
-        | col == 0 = LToken (Span loc loc) (Symbol ";") $ runLexer (state' {layouts = []})
+        | col == 1 = LToken (Span loc loc) (Symbol ";") $ runLexer (state' {layouts = []})
         | otherwise = runLexer (state' {layouts = []})
       maybePopLayouts l@(Layout n : ls) =
         case compare n col of
@@ -294,6 +296,9 @@ doBol span _match state = do
           GT -> LToken (Span loc loc) ScopeEnd $ maybePopLayouts ls
       maybePopLayouts (NoLayout : _) = error "doBol: NoLayout" -- TODO: remove NoLayout
   maybePopLayouts (layouts state)
+
+doInit :: Action
+doInit _ _ = runLexer . popLContext
 
 openBrace :: Action
 openBrace sp _match state =
@@ -355,7 +360,7 @@ popLContext State {..} = case ctxStack of
 -- | Lex the input UTF-8 encoded bytestring.
 lexer :: ByteString -> LStream
 lexer input = do
-  let initCtxStack = [getLContext LBOL, getLContext L0]
+  let initCtxStack = [getLContext LINIT, getLContext L0]
       loc = Loc 1 1
       initState = State initCtxStack [] loc
   runLexer $ initState input
