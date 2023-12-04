@@ -198,18 +198,24 @@ doId span match state = do
       Nothing -> (i, j)
       Just ('.', n) -> do
         let bs' = ByteString.drop n bs
-        go cur bs' (cur+n) bs'
-      Just (_, n) -> go i j (cur+n) (ByteString.drop n bs)
+        go cur bs' (cur + n) bs'
+      Just (_, n) -> go i j (cur + n) (ByteString.drop n bs)
 
 doSymbol :: Action
+doSymbol span "=" state = do
+  let tok = Keyword "="
+  LToken span tok $ runLexer $ pushLContext LMAYBELAYOUT state
+doSymbol span ":" state = do
+  let tok = Keyword ":"
+  LToken span tok $ runLexer state
 doSymbol span match state = do
   let tok = Symbol (FastString.fromByteString match)
-      state' = maybeLayout match state
+      state' = state -- maybeLayout match state
   LToken span tok $ runLexer state'
 
-maybeLayout :: ByteString -> State -> State
-maybeLayout "=" = pushLContext LMAYBELAYOUT
-maybeLayout _ = id
+-- maybeLayout :: ByteString -> State -> State
+-- maybeLayout "=" = pushLContext LMAYBELAYOUT
+-- maybeLayout _ = id
 
 doDecimal :: Action
 doDecimal span match state = do
@@ -287,12 +293,12 @@ doBol span _match state = do
       loc = case span of Span _ loc' -> loc'
       state' = popLContext state
       maybePopLayouts []
-        | col == 1 = LToken (Span loc loc) (Symbol ";") $ runLexer (state' {layouts = []})
+        | col == 1 = LToken (Span loc loc) (Keyword ";") $ runLexer (state' {layouts = []})
         | otherwise = runLexer (state' {layouts = []})
       maybePopLayouts l@(Layout n : ls) =
         case compare n col of
           LT -> runLexer (state' {layouts = l})
-          EQ -> LToken (Span loc loc) (Symbol ";") $ runLexer (state' {layouts = l})
+          EQ -> LToken (Span loc loc) (Keyword ";") $ runLexer (state' {layouts = l})
           GT -> LToken (Span loc loc) ScopeEnd $ maybePopLayouts ls
       maybePopLayouts (NoLayout : _) = error "doBol: NoLayout" -- TODO: remove NoLayout
   maybePopLayouts (layouts state)

@@ -82,7 +82,7 @@ parseRecord us = do
 
 parseRecordRow :: Units -> Either Error (Units, (Pattern, Expr))
 parseRecordRow us =
-  -- let (a, sym, us') = 
+  -- let (a, sym, us') =
   case takeUntil us of
     Just (a, Located _ sym, us') -> do
       pat <- parsePattern a

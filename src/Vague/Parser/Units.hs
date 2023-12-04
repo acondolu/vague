@@ -27,6 +27,7 @@ data PUnit
 data BracketType = Round | Square | Curly | Scope
   deriving (Show)
 
+-- | Parenthesize the token stream.
 units :: Lexer.LStream -> Either Error.Error [PUnit]
 units = \stream -> do
   (stream', out) <- go [] stream
@@ -39,7 +40,7 @@ units = \stream -> do
       | tok `elem` [RRound, RCurly, RSquare, ScopeEnd] =
           pure (s, reverse acc)
       | otherwise =
-          case matching tok of
+          case closeOf tok of
             Nothing -> go (PToken span tok : acc) stream
             Just (ty, right) -> do
               (stream', out) <- go [] stream
@@ -48,6 +49,8 @@ units = \stream -> do
     go _ (LError err) = Left $ Error.fromLexerError err
     go acc LEnd = pure (LEnd, reverse acc)
 
+-- | Expect the given token to be the first in the stream.
+-- Return a parsing error instead.
 expect :: Token -> LStream -> Either Error.Error (LStream, Loc)
 expect tok (LToken (Span loc _) tok' stream'')
   | tok == tok' = pure (stream'', loc)
@@ -55,18 +58,18 @@ expect tok (LToken (Span loc _) tok' stream'')
 expect _ (LError err) = Left $ Error.fromLexerError err
 expect _ LEnd = Left Error.UnexpectedEOF
 
-matching :: Token -> Maybe (BracketType, Token)
-matching LRound = Just (Round, RRound)
-matching LSquare = Just (Square, RSquare)
-matching LCurly = Just (Curly, RCurly)
-matching ScopeBegin = Just (Scope, ScopeEnd)
-matching _ = Nothing
-
 openOf :: BracketType -> Token
 openOf Round = LRound
 openOf Square = LSquare
 openOf Curly = LCurly
 openOf Scope = ScopeBegin
+
+closeOf :: Token -> Maybe (BracketType, Token)
+closeOf LRound = Just (Round, RRound)
+closeOf LSquare = Just (Square, RSquare)
+closeOf LCurly = Just (Curly, RCurly)
+closeOf ScopeBegin = Just (Scope, ScopeEnd)
+closeOf _ = Nothing
 
 takeUntil :: Units -> Maybe (Units, Located FastString, Units)
 takeUntil = go []
@@ -76,7 +79,4 @@ takeUntil = go []
       go (u : acc) us
     go acc (u@(PToken span tok) : us) = case tok of
       Keyword k -> Just (reverse acc, Located span k, us)
-      Symbol ";" -> Just (reverse acc, Located span ";", us)
-      Symbol "=" -> Just (reverse acc, Located span "=", us)
-      Symbol ":" -> Just (reverse acc, Located span ":", us)
       _ -> go (u : acc) us
