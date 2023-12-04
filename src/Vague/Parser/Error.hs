@@ -9,6 +9,7 @@ data Error
   = Bug Text
   | UnexpectedEOF
   | UnexpectedChar Loc Char
+  | ExpectedChar Loc Char
   | UnexpectedToken Loc Lexer.Token
   | ExpectedToken Lexer.Token Loc Lexer.Token
   deriving (Show)

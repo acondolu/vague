@@ -3,6 +3,7 @@
 module Vague.Located
   ( Loc (..),
     Span (..),
+    Located (..),
   )
 where
 
@@ -16,3 +17,6 @@ data Span = Span Loc Loc
 
 instance Semigroup Span where
   Span loc1 _ <> Span _ loc2 = Span loc1 loc2
+
+data Located a = Located Span a
+  deriving (Show)

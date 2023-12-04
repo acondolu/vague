@@ -9,7 +9,5 @@ main () =
 ### Build
 
 ```bash
-stack install alex
-stack install happy
-stack install cpphs
+stack build
 ```

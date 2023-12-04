@@ -34,18 +34,17 @@ parseBlock us = do
 
 parseStmt :: Units -> Either Error (Units, Statement)
 parseStmt us = do
-  let (first, sym, us') = takeUntil us
-  case (first, sym) of
-    ([], "type") -> parseTypeBinding us'
-    (_, "=") -> parseBinding first us'
-    (_, ":") -> parseTypeDeclaration first us'
-    (_, ";") -> do
+  case takeUntil us of
+    Nothing -> do
+      e <- parseExpr us
+      pure ([], Statement e)
+    Just ([], Located _ "type", us') -> parseTypeBinding us'
+    Just (first, Located _ "=", us') -> parseBinding first us'
+    Just (first, Located _ ":", us') -> parseTypeDeclaration first us'
+    Just (first, Located _ ";", us') -> do
       e <- parseExpr first
       pure (us', Statement e)
-    (_, "") -> do
-      e <- parseExpr first
-      pure ([], Statement e)
-    _ -> error "parseStmt: unknown case" -- fixme error
+    Just _ -> error "parseStmt: unknown case" -- fixme error
 
 parseTypeBinding :: Units -> Either Error (Units, Statement)
 parseTypeBinding = undefined
@@ -53,29 +52,61 @@ parseTypeBinding = undefined
 parseBinding :: Units -> Units -> Either Error (Units, Statement)
 parseBinding pat us = do
   pat' <- parsePattern pat
-  let (first, sym, us') = takeUntil us
-  if sym == ";" || sym == ""
-    then do
+  -- let (first, sym, us') =
+  case takeUntil us of
+    Nothing -> do
+      expr <- parseExpr us
+      pure ([], Binding pat' expr)
+    Just (first, Located _ ";", us') -> do
       expr <- parseExpr first
       pure (us', Binding pat' expr)
-    else do
-      error $ "parseBinding: unknown case: " <> show sym -- fixme error
+    Just (_, Located (Span loc _) sym, _) ->
+      Left $ UnexpectedToken loc (Keyword sym)
 
 parsePattern :: Units -> Either Error Pattern
 parsePattern = traverse go
   where
     go (PToken _ (Qualid "" name)) = pure name
     go (PToken (Span loc _) tok) = Left $ UnexpectedToken loc tok
-    go (PBrack ty _) = Left $ Bug $ "unexpected bracket: " <> pack (show ty)
+    go (PBrack (Span loc _) ty _) = Left $ UnexpectedToken loc (openOf ty)
 
 parseTypeDeclaration :: Units -> Units -> Either Error (Units, Statement)
 parseTypeDeclaration = undefined
+
+parseRecord :: Units -> Either Error [(Pattern, Expr)]
+parseRecord [] = Right []
+parseRecord us = do
+  (us', row) <- parseRecordRow us
+  rows <- parseRecord us'
+  pure $ row : rows
+
+parseRecordRow :: Units -> Either Error (Units, (Pattern, Expr))
+parseRecordRow us =
+  -- let (a, sym, us') = 
+  case takeUntil us of
+    Just (a, Located _ sym, us') -> do
+      pat <- parsePattern a
+      case sym of
+        "=" -> case takeUntil us' of
+          Nothing -> do
+            expr <- parseExpr us'
+            pure ([], (pat, expr))
+          Just (b, Located _ ";", us'') -> do
+            expr <- parseExpr b
+            pure (us'', (pat, expr))
+          Just (_, Located (Span loc _) sym', _) ->
+            Left $ UnexpectedToken loc (Keyword sym')
+        _ -> undefined
+    Nothing -> do
+      _ <- parsePattern us
+      error "BUG: parseRecordRow" -- TODO: expcted '='
 
 --------------------------------------------------------------------------------
 
 exprOfPBrack :: BracketType -> Units -> Either Error Expr
 exprOfPBrack Round us = parseExpr us
 exprOfPBrack Scope us = Block <$> parseBlock us
+exprOfPBrack Curly us = RecordE <$> parseRecord us
 exprOfPBrack p _ = error $ "BUG: exprOfPBrack: " <> show p
 
 -- | This is for simple values, like identifiers, numbers, literals.
@@ -96,7 +127,7 @@ parseExpr :: Units -> Either Error Expr
 parseExpr = go [] [] []
   where
     go :: [Expr] -> [FastString] -> [Expr] -> Units -> Either Error Expr
-    go operands operators cur (PBrack btype ins : us) = do
+    go operands operators cur (PBrack _ btype ins : us) = do
       e' <- exprOfPBrack btype ins
       go operands operators (e' : cur) us
     go operands operators cur (PToken s@(Span loc _) tok : us) = case tok of

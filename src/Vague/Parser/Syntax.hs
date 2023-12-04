@@ -33,6 +33,7 @@ data Expr
   | AppE Expr [Expr]
   | FunE [Id] Expr
   | Block [Statement]
+  | RecordE [(Pattern, Expr)]
   deriving (Show)
 
 data TypeExpr

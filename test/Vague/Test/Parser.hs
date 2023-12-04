@@ -23,7 +23,7 @@ tests =
     "Parser"
     [ makeTest "empty",
       makeTest "ass",
-      -- makeTest "curly",
+      makeTest "curly",
       makeTest "str",
       makeTest "def",
       makeTest "6"
