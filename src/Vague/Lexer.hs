@@ -8,7 +8,6 @@ module Vague.Lexer
     Token (..),
     LexerError (..),
     lexer,
-    main, -- TODO: remove
   )
 where
 
@@ -54,7 +53,6 @@ data Token
   | Literal ByteString
   | -- Keywords
     Keyword FastString
-  | LOL -- just for testing
   deriving (Show, Eq)
 
 data LexerError
@@ -165,9 +163,7 @@ rules =
     -- - If there's no newline, cancel the layout context.
     ([LMAYBELAYOUT], "(?!\\n)", \_ _ -> runLexer . popLContext),
     -- LFINDOFFSIDE
-    ([LFINDOFFSIDE], "(?=.)", doFindOffside),
-    -- TESTING (to remove)
-    ([LTEST], "\\x{1F923}", token LOL)
+    ([LFINDOFFSIDE], "(?=.)", doFindOffside)
   ]
 
 varidRe :: String
@@ -370,11 +366,3 @@ lexer input = do
       loc = Loc 1 1
       initState = State initCtxStack [] loc
   runLexer $ initState input
-
-main :: IO ()
-main = do
-  print PCRE.configUTF8
-  let initCtxStack = [getLContext LTEST, getLContext LBOL, getLContext L0]
-      loc = Loc 1 1
-      initState = State initCtxStack [] loc
-  print $ runLexer $ initState $ UTF8.fromString "{ { }     🤣 # this is a comment\n }"
