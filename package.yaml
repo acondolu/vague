@@ -49,6 +49,7 @@ library:
   dependencies:
   - regex-pcre
   - vector
+  - unordered-containers
 
 executables:
   vague-exe:

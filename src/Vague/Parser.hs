@@ -8,7 +8,7 @@ where
 
 import qualified Data.Map as Map
 import Data.Text (pack)
-import Vague.FastString (FastString)
+import Vague.FastString (FastString, fsShow)
 import Vague.Lexer (Token (..))
 import qualified Vague.Lexer as Lexer
 import Vague.Located
@@ -44,7 +44,7 @@ parseStmt us = do
     Just (first, Located _ ";", us') -> do
       e <- parseExpr first
       pure (us', Statement e)
-    Just _ -> error "parseStmt: unknown case" -- fixme error
+    Just (_, Located _ x, _) -> error $ "parseStmt: unknown case: " <> fsShow x <> " /= " <> fsShow "=" -- fixme error
 
 parseTypeBinding :: Units -> Either Error (Units, Statement)
 parseTypeBinding = undefined
