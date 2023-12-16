@@ -50,12 +50,12 @@ print fp err = do
           putStr "    "
           putStrLn line
           putStrLn $ "    " <> replicate (col - 1) ' ' <> "^"
-
   putStrLn $ errorMsg err
 
 getLineFrom :: Int -> String -> Maybe String
 getLineFrom n str = lines str !? n
 
+-- | Safe list head.
 (!?) :: [a] -> Int -> Maybe a
 [] !? _ = Nothing
 (x : xs) !? n

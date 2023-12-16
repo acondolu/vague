@@ -50,6 +50,8 @@ library:
   - regex-pcre
   - vector
   - unordered-containers
+  - directory
+  - filepath
 
 executables:
   vague-exe:
@@ -61,6 +63,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - vague
+    - optparse-applicative
 
 tests:
   vague-test:
