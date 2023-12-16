@@ -2,9 +2,9 @@ module Main (main) where
 
 import qualified Data.ByteString as ByteString
 import System.Environment (getArgs)
+import qualified Vague.Interpreter as Interpreter
 import qualified Vague.Lexer as Lexer
 import qualified Vague.Parser as Parser
-import qualified Vague.Interpreter as Interpreter
 import qualified Vague.Parser.Error as Error
 
 main :: IO ()

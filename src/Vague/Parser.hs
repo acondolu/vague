@@ -7,6 +7,7 @@ module Vague.Parser
   )
 where
 
+import Control.Applicative (Alternative (..))
 import qualified Data.Map as Map
 import Vague.FastString (FastString, fsShow)
 import Vague.Lexer (Token (..))
@@ -16,7 +17,6 @@ import Vague.Parser.Error (Error (..))
 import Vague.Parser.Syntax
 import Vague.Parser.Units
 import Prelude hiding (span)
-import Control.Applicative (Alternative (..))
 
 -- | Parse a token stream into a 'Program'.
 parse :: Lexer.LStream -> Either Error Program
@@ -206,7 +206,6 @@ fixities op = case Map.lookup op m of
           ("+", Fixity (Binary ALeft) 6)
         ]
 
-
 --------------------------------------------------------------------------------
 
 data Result a = RError Error | ROk Units a
@@ -215,7 +214,7 @@ instance Functor Result where
   fmap _ (RError err) = RError err
   fmap f (ROk us a) = ROk us (f a)
 
-newtype Parser a  = Parser (Units -> Result a)
+newtype Parser a = Parser (Units -> Result a)
 
 instance Functor Parser where
   fmap f (Parser p) = Parser $ fmap f . p

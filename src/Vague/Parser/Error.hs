@@ -58,6 +58,6 @@ getLineFrom n str = lines str !? n
 
 (!?) :: [a] -> Int -> Maybe a
 [] !? _ = Nothing
-(x:xs) !? n
+(x : xs) !? n
   | n == 0 = Just x
-  | otherwise = xs !? (n-1)
+  | otherwise = xs !? (n - 1)
