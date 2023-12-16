@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StrictData #-}
 
 module Vague.Parser
   ( parse,
@@ -7,7 +8,6 @@ module Vague.Parser
 where
 
 import qualified Data.Map as Map
-import Data.Text (pack)
 import Vague.FastString (FastString, fsShow)
 import Vague.Lexer (Token (..))
 import qualified Vague.Lexer as Lexer
@@ -16,6 +16,7 @@ import Vague.Parser.Error (Error (..))
 import Vague.Parser.Syntax
 import Vague.Parser.Units
 import Prelude hiding (span)
+import Control.Applicative (Alternative (..))
 
 -- | Parse a token stream into a 'Program'.
 parse :: Lexer.LStream -> Either Error Program
@@ -51,8 +52,9 @@ parseTypeBinding = undefined
 
 parseBinding :: Units -> Units -> Either Error (Units, Statement)
 parseBinding pat us = do
+  -- TODO: parse also assignment to mutable record attributes,
+  -- like expr.name1.name2.name3 = expr'
   pat' <- parsePattern pat
-  -- let (first, sym, us') =
   case takeUntil us of
     Nothing -> do
       expr <- parseExpr us
@@ -82,7 +84,6 @@ parseRecord us = do
 
 parseRecordRow :: Units -> Either Error (Units, (Pattern, Expr))
 parseRecordRow us =
-  -- let (a, sym, us') =
   case takeUntil us of
     Just (a, Located _ sym, us') -> do
       pat <- parsePattern a
@@ -107,7 +108,7 @@ exprOfPBrack :: BracketType -> Units -> Either Error Expr
 exprOfPBrack Round us = parseExpr us
 exprOfPBrack Scope us = Block <$> parseBlock us
 exprOfPBrack Curly us = RecordE <$> parseRecord us
-exprOfPBrack p _ = error $ "BUG: exprOfPBrack: " <> show p
+exprOfPBrack Square _ = error "exprOfPBrack: Square TODO"
 
 -- | This is for simple values, like identifiers, numbers, literals.
 exprOfToken :: Span -> Token -> Either Error Expr
@@ -204,3 +205,42 @@ fixities op = case Map.lookup op m of
         [ ("*", Fixity (Binary ALeft) 7),
           ("+", Fixity (Binary ALeft) 6)
         ]
+
+
+--------------------------------------------------------------------------------
+
+data Result a = RError Error | ROk Units a
+
+instance Functor Result where
+  fmap _ (RError err) = RError err
+  fmap f (ROk us a) = ROk us (f a)
+
+newtype Parser a  = Parser (Units -> Result a)
+
+instance Functor Parser where
+  fmap f (Parser p) = Parser $ fmap f . p
+
+instance Applicative Parser where
+  pure x = Parser $ \us -> ROk us x
+  Parser f <*> Parser a = Parser $ \us -> case f us of
+    RError err -> RError err
+    ROk us' f' -> f' <$> a us'
+
+instance Monad Parser where
+  Parser p >>= f = Parser $ \us -> case p us of
+    RError err -> RError err
+    ROk us' a -> case f a of
+      Parser g -> g us'
+
+instance Alternative Parser where
+  empty = Parser $ \_ -> RError undefined
+  Parser f <|> Parser g = Parser $ \us ->
+    case f us of
+      RError _ -> g us
+      ROk us' a -> ROk us' a
+
+runParser :: Parser a -> Units -> Either Error a
+runParser (Parser a) us = case a us of
+  RError err -> Left err
+  ROk [] a -> Right a
+  ROk us _ -> error "TODO"
