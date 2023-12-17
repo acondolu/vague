@@ -4,9 +4,9 @@
 {-# LANGUAGE StrictData #-}
 
 module Vague.Lexer
-  ( LStream (..),
+  ( LxStream (..),
     Token (..),
-    LexerError (..),
+    LxError (..),
     lexer,
   )
 where
@@ -28,9 +28,9 @@ import Prelude hiding (span)
 
 -- https://www.pcre.org/original/doc/html/pcrepattern.html
 
-data LStream
-  = LToken Span Token ~LStream
-  | LError LexerError
+data LxStream
+  = LToken Span Token ~LxStream
+  | LError LxError
   | LEnd
   deriving (Show)
 
@@ -55,13 +55,13 @@ data Token
     Keyword FastString
   deriving (Show, Eq)
 
-data LexerError
-  = LexerError String
+data LxError
+  = LxError String
   | UnexpectedEOF Loc
   | UnexpectedChar Loc Char
   deriving (Show)
 
-lexerError :: LexerError -> LStream
+lexerError :: LxError -> LxStream
 lexerError = LError
 
 type Action =
@@ -72,18 +72,18 @@ type Action =
   -- | Current state
   State ->
   -- | Stream of tokens
-  LStream
+  LxStream
 
-runLexer :: State -> LStream
+runLexer :: State -> LxStream
 runLexer State {ctxStack = []} =
-  lexerError $ LexerError "BUG: runLexer: empty context stack"
+  lexerError $ LxError "BUG: runLexer: empty context stack"
 runLexer State {..} | ByteString.null input = doEOF location layouts
 runLexer State {ctxStack = s@((pattern, acts) : _), ..} =
   case PCRE.matchOnceText pattern input of
     Nothing -> parseErrorOnInput location input
     Just (_, arr, rest) -> go rest $ tail $ Array.assocs arr
   where
-    go _ [] = lexerError $ LexerError "BUG: runLexer: match with no capture"
+    go _ [] = lexerError $ LxError "BUG: runLexer: match with no capture"
     go rest ((_, ("", _)) : ms)
       | not (null ms) =
           -- Ignore empty strings, as they signal "no match".
@@ -92,7 +92,7 @@ runLexer State {ctxStack = s@((pattern, acts) : _), ..} =
           -- capture, and in that case, we run it (see below).
           go rest ms
     go rest ((i, (m, _)) : _) = case acts Vector.!? (i - 1) of
-      Nothing -> lexerError $ LexerError "BUG: runLexer: unknown action"
+      Nothing -> lexerError $ LxError "BUG: runLexer: unknown action"
       Just act -> do
         let loc' = incrLoc m location
         act (Span location loc') m $ State s layouts loc' rest
@@ -103,7 +103,7 @@ runLexer State {ctxStack = s@((pattern, acts) : _), ..} =
       | m == "\n" = Loc (i + 1) 1
       | otherwise = Loc i (j + nChars m)
 
-parseErrorOnInput :: Loc -> ByteString -> LStream
+parseErrorOnInput :: Loc -> ByteString -> LxStream
 parseErrorOnInput loc bs = lexerError $ case UTF8.decode bs of
   Nothing -> UnexpectedEOF loc
   Just (c, _) -> UnexpectedChar loc c
@@ -319,7 +319,7 @@ doFindOffside span _ state = do
       state' = state & pushLayout (Layout col) & popLContext
   LToken span ScopeBegin $ runLexer state'
 
-doEOF :: Loc -> [Layout] -> LStream
+doEOF :: Loc -> [Layout] -> LxStream
 doEOF loc = popAllLayouts
   where
     popAllLayouts [] = LEnd
@@ -360,7 +360,7 @@ popLContext State {..} = case ctxStack of
 --------------------------------------------------------------------------------
 
 -- | Lex the input UTF-8 encoded bytestring.
-lexer :: ByteString -> LStream
+lexer :: ByteString -> LxStream
 lexer input = do
   let initCtxStack = [getLContext LINIT, getLContext L0]
       loc = Loc 1 1

@@ -3,7 +3,7 @@
 
 module Vague.Parser
   ( parse,
-    Error,
+    PsError,
   )
 where
 
@@ -13,27 +13,27 @@ import Vague.FastString (FastString, fsShow)
 import Vague.Lexer (Token (..))
 import qualified Vague.Lexer as Lexer
 import Vague.Located
-import Vague.Parser.Error (Error (..))
+import Vague.Parser.Error (PsError (..))
 import Vague.Parser.Syntax
 import Vague.Parser.Units
 import Prelude hiding (span)
 
 -- | Parse a token stream into a 'Program'.
-parse :: Lexer.LStream -> Either Error Program
+parse :: Lexer.LxStream -> Either PsError Program
 parse ls = units ls >>= parseProgram
 
-parseProgram :: Units -> Either Error Program
+parseProgram :: Units -> Either PsError Program
 parseProgram [] = Right $ Program []
 parseProgram us = Program <$> parseBlock us
 
-parseBlock :: Units -> Either Error [Statement]
+parseBlock :: Units -> Either PsError [Statement]
 parseBlock [] = Right []
 parseBlock us = do
   (us', stmt) <- parseStmt us
   stmts <- parseBlock us'
   pure $ stmt : stmts
 
-parseStmt :: Units -> Either Error (Units, Statement)
+parseStmt :: Units -> Either PsError (Units, Statement)
 parseStmt us = do
   case takeUntil us of
     Nothing -> do
@@ -47,10 +47,10 @@ parseStmt us = do
       pure (us', Statement e)
     Just (_, Located _ x, _) -> error $ "parseStmt: unknown case: " <> fsShow x <> " /= " <> fsShow "=" -- fixme error
 
-parseTypeBinding :: Units -> Either Error (Units, Statement)
+parseTypeBinding :: Units -> Either PsError (Units, Statement)
 parseTypeBinding = undefined
 
-parseBinding :: Units -> Units -> Either Error (Units, Statement)
+parseBinding :: Units -> Units -> Either PsError (Units, Statement)
 parseBinding pat us = do
   -- TODO: parse also assignment to mutable record attributes,
   -- like expr.name1.name2.name3 = expr'
@@ -65,24 +65,24 @@ parseBinding pat us = do
     Just (_, Located (Span loc _) sym, _) ->
       Left $ UnexpectedToken loc (Keyword sym)
 
-parsePattern :: Units -> Either Error Pattern
+parsePattern :: Units -> Either PsError Pattern
 parsePattern = traverse go
   where
     go (PToken _ (Qualid "" name)) = pure name
     go (PToken (Span loc _) tok) = Left $ UnexpectedToken loc tok
     go (PBrack (Span loc _) ty _) = Left $ UnexpectedToken loc (openOf ty)
 
-parseTypeDeclaration :: Units -> Units -> Either Error (Units, Statement)
+parseTypeDeclaration :: Units -> Units -> Either PsError (Units, Statement)
 parseTypeDeclaration = undefined
 
-parseRecord :: Units -> Either Error [(Pattern, Expr)]
+parseRecord :: Units -> Either PsError [(Pattern, Expr)]
 parseRecord [] = Right []
 parseRecord us = do
   (us', row) <- parseRecordRow us
   rows <- parseRecord us'
   pure $ row : rows
 
-parseRecordRow :: Units -> Either Error (Units, (Pattern, Expr))
+parseRecordRow :: Units -> Either PsError (Units, (Pattern, Expr))
 parseRecordRow us =
   case takeUntil us of
     Just (a, Located _ sym, us') -> do
@@ -104,14 +104,14 @@ parseRecordRow us =
 
 --------------------------------------------------------------------------------
 
-exprOfPBrack :: BracketType -> Units -> Either Error Expr
+exprOfPBrack :: BracketType -> Units -> Either PsError Expr
 exprOfPBrack Round us = parseExpr us
 exprOfPBrack Scope us = Block <$> parseBlock us
 exprOfPBrack Curly us = RecordE <$> parseRecord us
 exprOfPBrack Square _ = error "exprOfPBrack: Square TODO"
 
 -- | This is for simple values, like identifiers, numbers, literals.
-exprOfToken :: Span -> Token -> Either Error Expr
+exprOfToken :: Span -> Token -> Either PsError Expr
 exprOfToken span (Qualid qs n) = pure $ IdE qs n
 exprOfToken span (Decimal n) = pure $ NumberE n
 exprOfToken span (Literal s) = pure $ LitE s
@@ -124,10 +124,10 @@ mkApp h tl = AppE h tl
 -- | Parse all units in input as an expression.
 -- Uses the "shunting yard" algorithm to handle infix operators.
 -- See https://en.wikipedia.org/wiki/Shunting_yard_algorithm.
-parseExpr :: Units -> Either Error Expr
+parseExpr :: Units -> Either PsError Expr
 parseExpr = go [] [] []
   where
-    go :: [Expr] -> [FastString] -> [Expr] -> Units -> Either Error Expr
+    go :: [Expr] -> [FastString] -> [Expr] -> Units -> Either PsError Expr
     go operands operators cur (PBrack _ btype ins : us) = do
       e' <- exprOfPBrack btype ins
       go operands operators (e' : cur) us
@@ -155,7 +155,7 @@ parseExpr = go [] [] []
     go operands [] [] [] = error $ "BUG: too many operands: " <> show operands
 
 -- Pop operators from the stack according to precedences.
-popUntil :: Fixity -> [FastString] -> [Expr] -> Either Error ([Expr], [FastString])
+popUntil :: Fixity -> [FastString] -> [Expr] -> Either PsError ([Expr], [FastString])
 popUntil _ [] operands = pure (operands, [])
 popUntil fx (name : operators') operands
   | fx << fixities name = do
@@ -164,7 +164,7 @@ popUntil fx (name : operators') operands
 popUntil _ operators operands =
   pure (operands, operators)
 
-mkOp :: FastString -> Fixity -> [Expr] -> Either Error [Expr]
+mkOp :: FastString -> Fixity -> [Expr] -> Either PsError [Expr]
 mkOp name (Fixity (Binary _) _) (e2 : e1 : es) =
   -- fixme! spans are lost ...
   pure $ AppE (IdE "" name) [e1, e2] : es
@@ -208,7 +208,7 @@ fixities op = case Map.lookup op m of
 
 --------------------------------------------------------------------------------
 
-data Result a = RError Error | ROk Units a
+data Result a = RError PsError | ROk Units a
 
 instance Functor Result where
   fmap _ (RError err) = RError err
@@ -238,7 +238,7 @@ instance Alternative Parser where
       RError _ -> g us
       ROk us' a -> ROk us' a
 
-runParser :: Parser a -> Units -> Either Error a
+runParser :: Parser a -> Units -> Either PsError a
 runParser (Parser a) us = case a us of
   RError err -> Left err
   ROk [] a -> Right a
