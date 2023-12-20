@@ -2,11 +2,11 @@ module Main (main) where
 
 import Control.Monad (join)
 import qualified Data.ByteString as ByteString
+import Options.Applicative
 import qualified Vague.Interpreter as Interpreter
 import qualified Vague.Lexer as Lexer
 import qualified Vague.Parser as Parser
 import qualified Vague.Parser.Error as Error
-import Options.Applicative
 
 main :: IO ()
 main = join $ execParser opts

@@ -1,1 +1,1 @@
-Right (Program [Binding ["x"] (Block [Binding ["y"] (NumberE 0),Binding ["z"] (NumberE 3)])])
+Right (Program [] [Binding ["x"] (Block [Binding ["y"] (NumberE 0),Binding ["z"] (NumberE 3)])])

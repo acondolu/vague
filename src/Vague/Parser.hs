@@ -23,8 +23,22 @@ parse :: Lexer.LxStream -> Either PsError Program
 parse ls = units ls >>= parseProgram
 
 parseProgram :: Units -> Either PsError Program
-parseProgram [] = Right $ Program []
-parseProgram us = Program <$> parseBlock us
+parseProgram [] = Right $ Program [] []
+parseProgram us = do
+  (us', imports) <- parseImports us
+  Program imports <$> parseBlock us'
+
+parseImports :: Units -> Either PsError (Units, [Import])
+parseImports = go []
+  where
+    go is [] = pure ([], reverse is)
+    go is (PToken span (Keyword "import") : us) = do
+      (us', i) <- pModuleName us
+      go (ImQualified i : is) us'
+    go is us = pure (us, reverse is)
+
+pModuleName :: Units -> Either PsError (Units, ModuleName)
+pModuleName = undefined
 
 parseBlock :: Units -> Either PsError [Statement]
 parseBlock [] = Right []

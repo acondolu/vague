@@ -4,12 +4,16 @@ import Data.ByteString (ByteString)
 import Data.Text (Text)
 import Vague.FastString (FastString)
 
-newtype Program = Program [Statement]
+data Program = Program [Import] [Statement]
   deriving (Show)
 
-data Import
-  = ImQualified [Id] Id
-  | ImFrom [Id] Id [Id]
+newtype Import
+  = ImQualified ModuleName
+  -- ImFrom [Id] Id [Id]
+  deriving (Show)
+
+data ModuleName = ModuleName [Id] Id
+  deriving (Show)
 
 data Statement
   = -- | id: TypeExpr

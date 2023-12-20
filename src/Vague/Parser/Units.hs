@@ -71,6 +71,7 @@ closeOf LCurly = Just (Curly, RCurly)
 closeOf ScopeBegin = Just (Scope, ScopeEnd)
 closeOf _ = Nothing
 
+-- | Take units until first keyword.
 takeUntil :: Units -> Maybe (Units, Located FastString, Units)
 takeUntil = go []
   where

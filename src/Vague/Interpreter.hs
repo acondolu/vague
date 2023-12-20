@@ -23,7 +23,7 @@ mkScope = aux mempty
     aux s [] = pure s
 
 run :: Parser.Program -> IO ()
-run (Parser.Program decls) = do
+run (Parser.Program imports decls) = do
   scope <- mkScope decls
   case Map.lookup "main" scope of
     Nothing -> error "main function is not defined"

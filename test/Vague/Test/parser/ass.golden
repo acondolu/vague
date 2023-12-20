@@ -1,1 +1,1 @@
-Right (Program [Binding ["x"] (NumberE 10)])
+Right (Program [] [Binding ["x"] (NumberE 10)])

@@ -1,8 +1,9 @@
-module Vague.Parser.Error (
-  PsError (..),
-  fromLxError,
-  print,
-) where
+module Vague.Parser.Error
+  ( PsError (..),
+    fromLxError,
+    print,
+  )
+where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
