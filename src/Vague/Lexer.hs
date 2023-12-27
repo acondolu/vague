@@ -32,8 +32,17 @@ data LxStream
   | LEnd
   deriving (Show)
 
-data Loose = Loose Bool Bool
+--------------------------------------------------------------------------------
+-- Tightness
+
+data Looseness = Looseness Bool Bool
   deriving (Show, Eq)
+
+mkLooseness :: Bool -> Bool -> Looseness
+mkLooseness = Looseness
+
+--------------------------------------------------------------------------------
+-- Tokens
 
 data Token
   = -- brackets
@@ -48,7 +57,7 @@ data Token
     ScopeBegin
   | ScopeEnd
   | -- other symbols
-    Symbol FastString Loose
+    Symbol FastString Looseness
   | --
     Qualid FastString FastString
   | Decimal Integer
@@ -149,7 +158,7 @@ mkLContext ys =
 rules :: [([LContextName], String, Action)]
 rules =
   [ ([], "(?:(?!\\n)\\p{Zs})+", doSkip), -- skip whitespace but not newlines
-    ([], "#[^\\n]*", doSkip), -- skip comments
+    ([], "//[^\\n]*", doSkip), -- skip comments
     -- LBOL
     ([LINIT, LBOL, LFINDOFFSIDE], "\\n", doSkip), -- skip newlines
     ([LBOL], "(?!\\p{Zs})", doBol), -- WARNING! It should be the last rule!
@@ -160,10 +169,10 @@ rules =
     ([L0], "\\{", openBrace),
     ([L0], "\\}", closeBrace),
     ([L0], "\\(", token LRound),
-    ([L0], "\\(", token RRound),
+    ([L0], "\\)", token RRound),
     ([L0], "\\[", token LSquare),
     ([L0], "\\]", token RSquare),
-    ([L0], "$\\(", token LSplice),
+    ([L0], "\\$\\(", token LSplice),
     ([L0], "type", token (Keyword "type")),
     ([L0], "import", token (Keyword "import")),
     ([L0], "(?:" <> varidRe <> "\\.)*" <> varidRe, doId),
@@ -184,7 +193,7 @@ varidRe :: String
 varidRe = "[\\p{L}_][\\p{L}\\p{N}\\p{M}_]*"
 
 symRe :: String
-symRe = "[\\!\\$\\%\\&\\*\\+\\.\\/\\<\\=\\>\\?\\@\\\\\\^\\|\\-\\~\\:]+"
+symRe = "[\\!\\$\\%\\&\\*\\+\\.\\/\\<\\=\\>\\?\\@\\\\\\^\\|\\-\\~\\:#]+"
 
 -- | Get lexer context from its name.
 getLContext :: LContextName -> LContext
@@ -223,11 +232,11 @@ doSymbol span match state = do
       state' = state -- maybeLayout match state
   LToken span tok $ runLexer state'
 
-loose :: State -> Loose
+loose :: State -> Looseness
 loose State {..} = do
   let before = previousMatchWasSpace
       after = isSpace input
-  Loose before after
+  mkLooseness before after
 
 -- maybeLayout :: ByteString -> State -> State
 -- maybeLayout "=" = pushLContext LMAYBELAYOUT
