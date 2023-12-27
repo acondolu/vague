@@ -122,6 +122,7 @@ exprOfPBrack :: BracketType -> Units -> Either PsError Expr
 exprOfPBrack Round us = parseExpr us
 exprOfPBrack Scope us = Block <$> parseBlock us
 exprOfPBrack Curly us = RecordE <$> parseRecord us
+exprOfPBrack Splice us = SpliceE <$> parseBlock us 
 exprOfPBrack Square _ = error "exprOfPBrack: Square TODO"
 
 -- | This is for simple values, like identifiers, numbers, literals.
@@ -145,6 +146,9 @@ parseExpr = go [] [] []
     go operands operators cur (PBrack _ btype ins : us) = do
       e' <- exprOfPBrack btype ins
       go operands operators (e' : cur) us
+    go operands operators cur (PToken _ (Symbol "#" (Lexer.Looseness _ False)) : PToken _ (Qualid _ name) : us) =
+      -- Quoted identifier
+      go operands operators (QuoteE name : cur) us
     go operands operators cur (PToken s@(Span loc _) tok : us) = case tok of
       Symbol name _loose -> case reverse cur of
         [] -> Left $ UnexpectedToken loc tok

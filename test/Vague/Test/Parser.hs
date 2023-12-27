@@ -26,5 +26,6 @@ tests =
       makeTest "curly",
       makeTest "str",
       makeTest "def",
-      makeTest "6"
+      makeTest "6",
+      makeTest "7"
     ]

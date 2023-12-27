@@ -38,6 +38,8 @@ data Expr
   | FunE [Id] Expr
   | Block [Statement]
   | RecordE [(Pattern, Expr)]
+  | SpliceE [Statement]
+  | QuoteE Id
   deriving (Show)
 
 data TypeExpr

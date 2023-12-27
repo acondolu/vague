@@ -32,6 +32,7 @@ ghc-options:
 - -Wall
 - -Wcompat
 - -Widentities
+- -Wincomplete-patterns
 - -Wincomplete-record-updates
 - -Wincomplete-uni-patterns
 - -Wmissing-export-lists

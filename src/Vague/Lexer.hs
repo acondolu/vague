@@ -8,6 +8,7 @@ module Vague.Lexer
     Token (..),
     LxError (..),
     lexer,
+    Looseness (..),
   )
 where
 

@@ -1,0 +1,1 @@
+Right (Program [] [Binding ["x"] (NumberE 5),Statement (SpliceE [Statement (AppE (IdE "" "mk_fun") [QuoteE "x"])])])
