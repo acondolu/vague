@@ -167,13 +167,13 @@ rules =
     ([LINIT], "(?!\\p{Zs})", doInit), -- WARNING! It should be the last rule!
     -- L0
     ([L0], "\\n", \_ _ -> runLexer . pushLContext LBOL),
-    ([L0], "\\{", openBrace),
-    ([L0], "\\}", closeBrace),
-    ([L0], "\\(", token LRound),
-    ([L0], "\\)", token RRound),
-    ([L0], "\\[", token LSquare),
-    ([L0], "\\]", token RSquare),
-    ([L0], "\\$\\(", token LSplice),
+    ([L0], "\\{", openBrace LCurly),
+    ([L0], "\\}", closeBrace RCurly),
+    ([L0], "\\(", openBrace LRound),
+    ([L0], "\\)", closeBrace RRound),
+    ([L0], "\\[", openBrace LSquare),
+    ([L0], "\\]", closeBrace RSquare),
+    ([L0], "\\$\\(", openBrace LSplice),
     ([L0], "type", token (Keyword "type")),
     ([L0], "import", token (Keyword "import")),
     ([L0], "(?:" <> varidRe <> "\\.)*" <> varidRe, doId),
@@ -332,16 +332,16 @@ doBol span _match state = do
 doInit :: Action
 doInit _ _ = runLexer . popLContext
 
-openBrace :: Action
-openBrace sp _match state =
-  LToken sp LCurly $ runLexer (pushLayout NoLayout state)
+openBrace :: Token -> Action
+openBrace tok sp _match state =
+  LToken sp tok $ runLexer (pushLayout NoLayout state)
 
-closeBrace :: Action
-closeBrace sp match state =
+closeBrace :: Token -> Action
+closeBrace tok sp match state =
   case popLayout state of
     Nothing -> case sp of
       Span loc _ -> parseErrorOnInput loc match
-    Just state' -> LToken sp RCurly $ runLexer state'
+    Just state' -> LToken sp tok $ runLexer state'
 
 doFindOffside :: Action
 doFindOffside span _ state = do
