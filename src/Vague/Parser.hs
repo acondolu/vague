@@ -146,7 +146,7 @@ parseExpr = go [] [] []
       e' <- exprOfPBrack btype ins
       go operands operators (e' : cur) us
     go operands operators cur (PToken s@(Span loc _) tok : us) = case tok of
-      Symbol name -> case reverse cur of
+      Symbol name _loose -> case reverse cur of
         [] -> Left $ UnexpectedToken loc tok
         h : tl -> do
           (operands', operators') <- popUntil (fixities name) operators (mkApp h tl : operands)

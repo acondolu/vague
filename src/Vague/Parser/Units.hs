@@ -24,7 +24,7 @@ data PUnit
   | PToken Span Token
   deriving (Show)
 
-data BracketType = Round | Square | Curly | Scope
+data BracketType = Round | Square | Curly | Scope | Splice
   deriving (Show)
 
 -- | Parenthesize the token stream.
@@ -63,12 +63,14 @@ openOf Round = LRound
 openOf Square = LSquare
 openOf Curly = LCurly
 openOf Scope = ScopeBegin
+openOf Splice = LSplice
 
 closeOf :: Token -> Maybe (BracketType, Token)
 closeOf LRound = Just (Round, RRound)
 closeOf LSquare = Just (Square, RSquare)
 closeOf LCurly = Just (Curly, RCurly)
 closeOf ScopeBegin = Just (Scope, ScopeEnd)
+closeOf LSplice = Just (Splice, RRound)
 closeOf _ = Nothing
 
 -- | Take units until first keyword.

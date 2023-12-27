@@ -26,13 +26,14 @@ import qualified Vague.FastString as FastString
 import Vague.Located
 import Prelude hiding (span)
 
--- https://www.pcre.org/original/doc/html/pcrepattern.html
-
 data LxStream
   = LToken Span Token ~LxStream
   | LError LxError
   | LEnd
   deriving (Show)
+
+data Loose = Loose Bool Bool
+  deriving (Show, Eq)
 
 data Token
   = -- brackets
@@ -42,11 +43,12 @@ data Token
   | RRound
   | LSquare
   | RSquare
+  | LSplice
   | -- scoping (inserted)
     ScopeBegin
   | ScopeEnd
   | -- other symbols
-    Symbol FastString
+    Symbol FastString Loose
   | --
     Qualid FastString FastString
   | Decimal Integer
@@ -56,7 +58,7 @@ data Token
   deriving (Show, Eq)
 
 data LxError
-  = LxError String
+  = LxBug String
   | UnexpectedEOF Loc
   | UnexpectedChar Loc Char
   deriving (Show)
@@ -76,14 +78,14 @@ type Action =
 
 runLexer :: State -> LxStream
 runLexer State {ctxStack = []} =
-  lexerError $ LxError "BUG: runLexer: empty context stack"
+  lexerError $ LxBug "runLexer: empty context stack"
 runLexer State {..} | ByteString.null input = doEOF location layouts
 runLexer State {ctxStack = s@((pattern, acts) : _), ..} =
   case PCRE.matchOnceText pattern input of
     Nothing -> parseErrorOnInput location input
     Just (_, arr, rest) -> go rest $ tail $ Array.assocs arr
   where
-    go _ [] = lexerError $ LxError "BUG: runLexer: match with no capture"
+    go _ [] = lexerError $ LxBug "runLexer: match with no capture"
     go rest ((_, ("", _)) : ms)
       | not (null ms) =
           -- Ignore empty strings, as they signal "no match".
@@ -92,10 +94,11 @@ runLexer State {ctxStack = s@((pattern, acts) : _), ..} =
           -- capture, and in that case, we run it (see below).
           go rest ms
     go rest ((i, (m, _)) : _) = case acts Vector.!? (i - 1) of
-      Nothing -> lexerError $ LxError "BUG: runLexer: unknown action"
+      Nothing -> lexerError $ LxBug "runLexer: unknown action"
       Just act -> do
         let loc' = incrLoc m location
-        act (Span location loc') m $ State s layouts loc' rest
+            isSpace' = isSpace m
+        act (Span location loc') m $ State s layouts loc' currentMatchIsSpace isSpace' rest
     incrLoc m (Loc i j)
       -- Careful, relies on the assumption that
       -- newlines are always lexed separately and one
@@ -119,6 +122,14 @@ nChars bs = case UTF8.decode bs of
   Nothing -> 0
   Just (_, n) -> 1 + nChars (ByteString.drop n bs)
 
+isSpace :: ByteString -> Bool
+isSpace bs = case PCRE.matchOnceText pat bs of
+  Nothing -> False
+  Just _ -> True
+  where
+    pat :: PCRE.Regex
+    pat = PCRE.makeRegexOpts PCRE.compUTF8 PCRE.defaultExecOpt ("^\\p{Zs}" :: ByteString)
+
 --------------------------------------------------------------------------------
 -- Contexts
 
@@ -134,12 +145,13 @@ mkLContext ys =
       !actions = Vector.fromList $ map snd ys
    in (pattern, actions)
 
+-- See https://www.pcre.org/original/doc/html/pcrepattern.html .
 rules :: [([LContextName], String, Action)]
 rules =
-  [ ([], "(?:(?!\\n)\\p{Zs})+", doSkip), -- doSkip whitespace but not newlines
-    ([], "#[^\\n]*", doSkip), -- doSkip comments
+  [ ([], "(?:(?!\\n)\\p{Zs})+", doSkip), -- skip whitespace but not newlines
+    ([], "#[^\\n]*", doSkip), -- skip comments
     -- LBOL
-    ([LINIT, LBOL, LFINDOFFSIDE], "\\n", doSkip), -- doSkip newlines
+    ([LINIT, LBOL, LFINDOFFSIDE], "\\n", doSkip), -- skip newlines
     ([LBOL], "(?!\\p{Zs})", doBol), -- WARNING! It should be the last rule!
     -- LINIT
     ([LINIT], "(?!\\p{Zs})", doInit), -- WARNING! It should be the last rule!
@@ -151,6 +163,7 @@ rules =
     ([L0], "\\(", token RRound),
     ([L0], "\\[", token LSquare),
     ([L0], "\\]", token RSquare),
+    ([L0], "$\\(", token LSplice),
     ([L0], "type", token (Keyword "type")),
     ([L0], "import", token (Keyword "import")),
     ([L0], "(?:" <> varidRe <> "\\.)*" <> varidRe, doId),
@@ -206,9 +219,15 @@ doSymbol span ":" state = do
   let tok = Keyword ":"
   LToken span tok $ runLexer state
 doSymbol span match state = do
-  let tok = Symbol (FastString.fromByteString match)
+  let tok = Symbol (FastString.fromByteString match) (loose state)
       state' = state -- maybeLayout match state
   LToken span tok $ runLexer state'
+
+loose :: State -> Loose
+loose State {..} = do
+  let before = previousMatchWasSpace
+      after = isSpace input
+  Loose before after
 
 -- maybeLayout :: ByteString -> State -> State
 -- maybeLayout "=" = pushLContext LMAYBELAYOUT
@@ -334,6 +353,8 @@ data State = State
   { ctxStack :: [LContext],
     layouts :: [Layout],
     location :: Loc,
+    previousMatchWasSpace :: Bool,
+    currentMatchIsSpace :: Bool,
     input :: ByteString
   }
 
@@ -365,5 +386,5 @@ lexer :: ByteString -> LxStream
 lexer input = do
   let initCtxStack = [getLContext LINIT, getLContext L0]
       loc = Loc 1 1
-      initState = State initCtxStack [] loc
+      initState = State initCtxStack [] loc True True
   runLexer $ initState input

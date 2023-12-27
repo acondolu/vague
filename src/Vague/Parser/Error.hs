@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Vague.Parser.Error
   ( PsError (..),
     fromLxError,
@@ -21,7 +22,7 @@ data PsError
   deriving (Show)
 
 fromLxError :: Lexer.LxError -> PsError
-fromLxError (Lexer.LxError str) = Bug (Text.pack str)
+fromLxError (Lexer.LxBug str) = Bug ("(lexer) " <> Text.pack str)
 fromLxError Lexer.UnexpectedEOF {} = UnexpectedEOF
 fromLxError (Lexer.UnexpectedChar loc chr) = UnexpectedChar loc chr
 
