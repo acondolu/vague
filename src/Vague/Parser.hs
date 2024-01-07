@@ -47,8 +47,15 @@ pModuleName = go [] where
       PToken _ (Symbol ";" _) : us' ->
         Right (us', ModuleName $! reverse acc)
       [] -> Right (us, ModuleName $! reverse acc)
-      _ -> error "unexpected token"
-  go acc us = error "unexpected token"
+      _ -> Left $ unexpectedUnit us
+  go _ us = Left $ unexpectedUnit us
+
+unexpectedUnit :: Units -> PsError
+unexpectedUnit [] = UnexpectedEOF
+unexpectedUnit (PToken (Span loc _) tok : _) =
+  UnexpectedToken loc tok
+unexpectedUnit (PBrack (Span loc _) brak _ : _) =
+   UnexpectedToken loc $ openOf brak
 
 parseBlock :: Units -> Either PsError [Statement]
 parseBlock [] = Right []

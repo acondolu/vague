@@ -1,1 +1,1 @@
-LToken (Span 1:1 1:7) (Keyword "import") (LToken (Span 1:8 1:11) (Qualid "a" "b") (LToken (Span 1:12 1:14) (Identifier "as") (LToken (Span 1:15 1:16) (Identifier "c") LEnd)))
+LToken (Span 1:1 1:7) (Keyword "import") (LToken (Span 1:8 1:9) (Identifier "a") (LToken (Span 1:9 1:10) (Symbol "." (Looseness False False)) (LToken (Span 1:10 1:11) (Identifier "b") (LToken (Span 1:11 1:12) (Symbol "." (Looseness False False)) (LToken (Span 1:12 1:13) (Identifier "c") LEnd)))))
