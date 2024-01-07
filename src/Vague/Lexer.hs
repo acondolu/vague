@@ -60,7 +60,7 @@ data Token
   | -- other symbols
     Symbol FastString Looseness
   | --
-    Qualid FastString FastString
+    Identifier FastString
   | Decimal Integer
   | Literal ByteString
   | -- Keywords
@@ -108,7 +108,8 @@ runLexer State {ctxStack = s@((pattern, acts) : _), ..} =
       Just act -> do
         let loc' = incrLoc m location
             isSpace' = isSpace m
-        act (Span location loc') m $ State s layouts loc' currentMatchIsSpace isSpace' rest
+        act (Span location loc') m $
+          State s layouts loc' currentMatchIsSpace isSpace' rest
     incrLoc m (Loc i j)
       -- Careful, relies on the assumption that
       -- newlines are always lexed separately and one
@@ -176,7 +177,7 @@ rules =
     ([L0], "\\$\\(", openBrace LSplice),
     ([L0], "type", token (Keyword "type")),
     ([L0], "import", token (Keyword "import")),
-    ([L0], "(?:" <> varidRe <> "\\.)*" <> varidRe, doId),
+    ([L0], "(?:" <> varidRe <> ")*" <> varidRe, doId),
     ([L0], "\\-?[0-9]+", doDecimal),
     ([L0], symRe, doSymbol),
     ([L0], "\"", doString),
@@ -209,10 +210,10 @@ getLContext = (Map.!) lmap
 
 doId :: Action
 doId span match state = do
-  let (i, id') = go 0 match 0 match
-  let qual = FastString.fromByteString $ ByteString.take i match
-      name = FastString.fromByteString id'
-  LToken span (Qualid qual name) $ runLexer state
+  -- let (i, id') = go 0 match 0 match
+  -- let qual = FastString.fromByteString $ ByteString.take i match
+  --     name = FastString.fromByteString id'
+  LToken span (Identifier $ FastString.fromByteString match) $ runLexer state
   where
     go i j cur bs = case UTF8.decode bs of
       Nothing -> (i, j)

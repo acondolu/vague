@@ -19,13 +19,15 @@ makeTest fname = do
 
 tests :: TestTree
 tests =
-  testGroup
-    "Parser"
-    [ makeTest "empty",
-      makeTest "ass",
-      makeTest "curly",
-      makeTest "str",
-      makeTest "def",
-      makeTest "6",
-      makeTest "7"
-    ]
+  testGroup "Parser" $
+    map
+      makeTest
+      [ "empty",
+        "ass",
+        "curly",
+        "str",
+        "def",
+        "6",
+        "7",
+        "8"
+      ]

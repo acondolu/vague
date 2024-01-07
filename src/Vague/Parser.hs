@@ -38,7 +38,17 @@ parseImports = go []
     go is us = pure (us, reverse is)
 
 pModuleName :: Units -> Either PsError (Units, ModuleName)
-pModuleName = undefined
+pModuleName = go [] where
+  go :: [Id] -> Units -> Either PsError (Units, ModuleName)
+  go acc (PToken _ (Identifier name) : us) =
+    case us of
+      PToken _ (Symbol "." (Lexer.Looseness False False)) : us' ->
+        go (name:acc) us'
+      PToken _ (Symbol ";" _) : us' ->
+        Right (us', ModuleName $! reverse acc)
+      [] -> Right (us, ModuleName $! reverse acc)
+      _ -> error "unexpected token"
+  go acc us = error "unexpected token"
 
 parseBlock :: Units -> Either PsError [Statement]
 parseBlock [] = Right []
@@ -82,7 +92,7 @@ parseBinding pat us = do
 parsePattern :: Units -> Either PsError Pattern
 parsePattern = traverse go
   where
-    go (PToken _ (Qualid "" name)) = pure name
+    go (PToken _ (Identifier name)) = pure name
     go (PToken (Span loc _) tok) = Left $ UnexpectedToken loc tok
     go (PBrack (Span loc _) ty _) = Left $ UnexpectedToken loc (openOf ty)
 
@@ -122,12 +132,12 @@ exprOfPBrack :: BracketType -> Units -> Either PsError Expr
 exprOfPBrack Round us = parseExpr us
 exprOfPBrack Scope us = Block <$> parseBlock us
 exprOfPBrack Curly us = RecordE <$> parseRecord us
-exprOfPBrack Splice us = SpliceE <$> parseBlock us 
+exprOfPBrack Splice us = SpliceE <$> parseBlock us
 exprOfPBrack Square _ = error "exprOfPBrack: Square TODO"
 
 -- | This is for simple values, like identifiers, numbers, literals.
 exprOfToken :: Span -> Token -> Either PsError Expr
-exprOfToken span (Qualid qs n) = pure $ IdE qs n
+exprOfToken span (Identifier n) = pure $ IdE "" n
 exprOfToken span (Decimal n) = pure $ NumberE n
 exprOfToken span (Literal s) = pure $ LitE s
 exprOfToken (Span loc _) tok = Left $ UnexpectedToken loc tok
@@ -139,6 +149,7 @@ mkApp h tl = AppE h tl
 -- | Parse all units in input as an expression.
 -- Uses the "shunting yard" algorithm to handle infix operators.
 -- See https://en.wikipedia.org/wiki/Shunting_yard_algorithm.
+-- See https://www.engr.mun.ca/~theo/Misc/exp_parsing.htm.
 parseExpr :: Units -> Either PsError Expr
 parseExpr = go [] [] []
   where
@@ -146,7 +157,7 @@ parseExpr = go [] [] []
     go operands operators cur (PBrack _ btype ins : us) = do
       e' <- exprOfPBrack btype ins
       go operands operators (e' : cur) us
-    go operands operators cur (PToken _ (Symbol "#" (Lexer.Looseness _ False)) : PToken _ (Qualid _ name) : us) =
+    go operands operators cur (PToken _ (Symbol "#" (Lexer.Looseness _ False)) : PToken _ (Identifier name) : us) =
       -- Quoted identifier
       go operands operators (QuoteE name : cur) us
     go operands operators cur (PToken s@(Span loc _) tok : us) = case tok of

@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 module Vague.Parser.Error
   ( PsError (..),
     fromLxError,

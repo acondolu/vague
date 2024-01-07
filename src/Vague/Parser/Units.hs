@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Vague.Parser.Units
   ( PUnit (..),
     Units,
@@ -33,7 +31,8 @@ units = \stream -> do
   (stream', out) <- go [] stream
   case stream' of
     LEnd -> pure out
-    _ -> Left $ Error.Bug "units: LxStream not consumed"
+    LError err -> Left $ Error.fromLxError err
+    LToken (Span loc _) tok _ -> Left $ Error.UnexpectedToken loc tok
   where
     go :: [PUnit] -> Lexer.LxStream -> Either Error.PsError (Lexer.LxStream, [PUnit])
     go acc s@(LToken span@(Span loca _) tok stream)

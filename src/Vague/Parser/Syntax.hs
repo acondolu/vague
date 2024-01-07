@@ -12,7 +12,7 @@ newtype Import
   -- ImFrom [Id] Id [Id]
   deriving (Show)
 
-data ModuleName = ModuleName [Id] Id
+newtype ModuleName = ModuleName [Id] 
   deriving (Show)
 
 data Statement
@@ -25,6 +25,7 @@ data Statement
   | Statement Expr
   deriving (Show)
 
+-- TODO: extend to values (constructors, ...)
 type Pattern = [Id]
 
 type Id = FastString
