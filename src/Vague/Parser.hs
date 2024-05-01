@@ -55,7 +55,7 @@ unexpectedUnit [] = UnexpectedEOF
 unexpectedUnit (PToken (Span loc _) tok : _) =
   UnexpectedToken loc tok
 unexpectedUnit (PBrack (Span loc _) brak _ : _) =
-   UnexpectedToken loc $ openOf brak
+  UnexpectedToken loc $ openOf brak
 
 parseBlock :: Units -> Either PsError [Statement]
 parseBlock [] = Right []
