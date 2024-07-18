@@ -1,0 +1,3 @@
+[submodule "deps/llvm-hs"]
+	path = deps/llvm-hs
+	url = https://github.com/llvm-hs/llvm-hs.git
