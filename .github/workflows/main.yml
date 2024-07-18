@@ -7,6 +7,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - name: Init git submodules
+      run: |
+        git submodule update --init --recursive
     - name: Cache stack
       uses: actions/cache@v2
       with:
