@@ -22,7 +22,7 @@ tests =
   testGroup "Parser" $
     map
       makeTest
-      [ "empty",
+      [ "0",
         "ass",
         "curly",
         "str",

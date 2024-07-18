@@ -53,6 +53,8 @@ library:
   - unordered-containers
   - directory
   - filepath
+  - llvm-hs
+  - llvm-hs-pure
 
 executables:
   vague-exe:

@@ -177,7 +177,7 @@ rules =
     ([L0], "\\$\\(", openBrace LSplice),
     ([L0], "type", token (Keyword "type")),
     ([L0], "import", token (Keyword "import")),
-    ([L0], "(?:" <> varidRe <> ")*" <> varidRe, doId),
+    ([L0], varidRe, doId),
     ([L0], "\\-?[0-9]+", doDecimal),
     ([L0], symRe, doSymbol),
     ([L0], "\"", doString),
@@ -191,8 +191,13 @@ rules =
     ([LFINDOFFSIDE], "(?=.)", doFindOffside)
   ]
 
+-- | Warning! Just an approximation...
+-- (range of geometric shapes, misc symbols and dingbats)
+emojiRe :: String
+emojiRe = "\\x{25a0}-\\x{27bf}"
+
 varidRe :: String
-varidRe = "[\\p{L}_][\\p{L}\\p{N}\\p{M}_]*"
+varidRe = "[\\p{L}_"<>emojiRe<>"][\\p{L}\\p{N}\\p{M}_\\p{M}"<>emojiRe<>"]*"
 
 symRe :: String
 symRe = "[\\!\\$\\%\\&\\*\\+\\.\\/\\<\\=\\>\\?\\@\\\\\\^\\|\\-\\~\\:#]+"

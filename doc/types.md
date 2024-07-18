@@ -13,3 +13,12 @@
 - `bytes`: an array of bytes
 - `char`: a UTF-8 Unicode code point (one to four bytes)
 - `string`: a UTF-8 Unicode string
+
+## Records
+
+[..]
+
+## Enumerations
+
+[..]
+

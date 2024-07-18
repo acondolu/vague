@@ -21,12 +21,15 @@ tests =
   testGroup "Lexer" $
     map
       makeTest
-      [ "empty",
+      [ "0",
         "ass",
         "curly",
         "str",
         "def",
         "6",
         "7",
-        "8"
+        "8",
+        "9",
+        "10",
+        "11"
       ]
