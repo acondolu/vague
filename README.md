@@ -1,4 +1,4 @@
-# <img src="./logo.png" width="50" style="vertical-align: middle;"/> Vague
+# <img src="./logo.png" width="50" align="left" /> Vague
 
 Please, look away :flushed: ! Nothing to see here. This is just my hobby programming language interpreter/compiler. I use it to learn about cool staff: parsing theory, type systems, and other language design concepts.
 
