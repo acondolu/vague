@@ -1,9 +1,9 @@
 name:                vague
 version:             0.1.0.0
-github:              "githubuser/vague"
+github:              "acondolu/vague"
 license:             BSD-3-Clause
-author:              "Author name here"
-maintainer:          "example@example.com"
+author:              "Andrea Condoluci"
+maintainer:          "andreacondoluci@gmail.com"
 copyright:           "2023 Author name here"
 
 extra-source-files:
